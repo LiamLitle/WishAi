@@ -1,3 +1,9 @@
+<div align="right">
+
+[🇬🇧 English](README.md) | 🇫🇷 Français
+
+</div>
+
 <div align="center">
 
 # 🧠 WishAI
