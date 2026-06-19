@@ -2,7 +2,7 @@
 
 # 🧠 WishAI
 
-<!-- Stack & Compatibilité -->
+<!-- Stack & Compatibility -->
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![GPU](https://img.shields.io/badge/GPU-CUDA%20%7C%20CPU-76b900?logo=nvidia&logoColor=white)](https://pytorch.org/get-started/locally/)
@@ -10,36 +10,34 @@
 
 <br>
 
-<!-- Fonctionnalités Modernes -->
 [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97_HuggingFace-API_Ready-FFD21E)](https://huggingface.co/)
-[![Datasets](https://img.shields.io/badge/Datasets-135_curat%C3%A9s_%2B_100k%2B-blue)](DATASETS.md)
-[![Safetensors](https://img.shields.io/badge/Sauvegarde-Safetensors-green)](https://huggingface.co/docs/safetensors/index)
+[![Datasets](https://img.shields.io/badge/Datasets-135_curated_%2B_100k%2B-blue)](DATASETS.md)
+[![Safetensors](https://img.shields.io/badge/Save-Safetensors-green)](https://huggingface.co/docs/safetensors/index)
 [![Dashboard](https://img.shields.io/badge/UI-HTML5_%7C_Vanilla_JS-E34F26?logo=html5&logoColor=white)](/)
 
 <br>
 
-<!-- Licence -->
-[![License](https://img.shields.io/badge/Licence-Non--Commercial-red)](LICENSE)
+[![License](https://img.shields.io/badge/License-Non--Commercial-red)](LICENSE)
 
 <br>
 
-**nanoGPT c'est bien. Mais t'as pas de dashboard, pas de protection VRAM, et ton PC peut mourir en 4 minutes.**
+**nanoGPT is great. But you get no dashboard, no VRAM protection, and your PC can die in 4 minutes.**
 
-**WishAI règle ça.**
+**WishAI fixes that.**
 
-*Construit par Liam — from scratch.*
+*Built by Liam — learned from scratch.*
 
 </div>
 
 ---
 
-<!-- 📸 AJOUTE TON GIF ICI — enregistre le dashboard avec ScreenToGif puis décommente : -->
+<!-- 📸 ADD YOUR GIF HERE — record the dashboard with ScreenToGif then uncomment: -->
 <!-- ![WishAI Dashboard](assets/dashboard.gif) -->
 
 ---
 
-> WishAI te permet d'entraîner un vrai GPT sur ta machine locale, depuis zéro, sans config compliquée.
-> Télécharge des données, lance une commande, et regarde ton IA apprendre en temps réel dans un dashboard natif.
+> WishAI lets you train a real GPT on your local machine, from scratch, without complicated setup.
+> Download data, run one command, and watch your AI learn in real time in a native dashboard.
 
 ---
 
@@ -48,44 +46,44 @@
 <tr>
 <td align="center" width="16%">
 
-**📊 Dashboard natif**<br>
-Fenêtre locale<br>
-~60 Mo de RAM
+**📊 Native Dashboard**<br>
+Local window<br>
+~60 MB RAM
 
 </td>
 <td align="center" width="16%">
 
-**🛡️ Protection auto**<br>
+**🛡️ Auto Protection**<br>
 VRAM, RAM, temp<br>
-jamais de crash
+never crashes
 
 </td>
 <td align="center" width="16%">
 
-**📚 Bibliothèque**<br>
-135 curatés +<br>
-100k+ accessibles
+**📚 Dataset Library**<br>
+135 curated +<br>
+100k+ accessible
 
 </td>
 <td align="center" width="16%">
 
 **🔋 Accumulation**<br>
-Gros modèles sur<br>
-petites VRAM
+Large models on<br>
+small VRAM
 
 </td>
 <td align="center" width="16%">
 
 **🔄 Early stopping**<br>
-S'arrête tout seul<br>
-à convergence
+Stops automatically<br>
+at convergence
 
 </td>
 <td align="center" width="16%">
 
 **🧠 BPE from scratch**<br>
-3× plus de contexte<br>
-que char-level
+3× more context<br>
+than char-level
 
 </td>
 </tr>
@@ -96,320 +94,303 @@ que char-level
 
 ## Installation
 
-> Prérequis : **Python 3.8+**, **pip**, **git**
+> Requirements: **Python 3.8+**, **pip**, **git**
 
 ```bash
-git clone https://github.com/ton-pseudo/wishai
-cd wishai
+git clone https://github.com/LiamLitle/WishAi
+cd WishAi
 python go.py
 ```
 
-`go.py` installe les dépendances, vérifie le tokenizer, ouvre le dashboard, lance le moniteur en arrière-plan et démarre l'entraînement — tout en une commande.
+`go.py` installs dependencies, checks the tokenizer, opens the dashboard, starts the monitor in the background and begins training — all in one command.
 
-**GPU (optionnel mais recommandé) :** Si tu as une carte NVIDIA, installe PyTorch avec le support CUDA depuis [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/) — choisis ta version CUDA dans le sélecteur. Sans GPU, WishAI tourne quand même sur CPU (preset NANO recommandé).
+**GPU (optional but recommended):** If you have an NVIDIA card, install PyTorch with CUDA support from [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/) — pick your CUDA version in the selector. Without a GPU, WishAI still runs on CPU (NANO preset recommended).
 
 ---
 
-## Utilisation
+## Usage
 
-### 1. Télécharge des données
+### 1. Download data
 
 ```bash
 python src/telecharger.py
 ```
 
-La **Bibliothèque de Datasets** s'ouvre dans ton navigateur. Interface unifiée avec 4 sources filtrables :
+The **Dataset Library** opens in your browser. Unified interface with 4 filterable sources:
 
-- **📌 Notre Sélection** — **135 datasets** testés et organisés en 19 domaines : Encyclopédies (29 langues), Web, Littérature, Instructions, Code, Maths, Science, Médecine, Dialogues, Traduction, Droit, Finance, Éducation, et plus.
-- **🤗 HuggingFace** — accès direct aux **150 000+ datasets** du Hub. Recherche en temps réel avec debounce.
-- **🐙 GitHub** — recherche de dépôts datasets sur GitHub (triés par étoiles).
-- **📄 Papers with Code** — datasets académiques référencés dans des publications scientifiques (proxy serveur, pas de CORS).
+- **📌 Our Selection** — **135 tested datasets** organized in 19 domains: Encyclopedias (29 languages), Web, Literature, Instructions, Code, Math, Science, Medicine, Dialogues, Translation, Law, Finance, Education, and more.
+- **🤗 HuggingFace** — direct access to **150,000+ datasets** from the Hub. Real-time search with debounce.
+- **🐙 GitHub** — search dataset repositories on GitHub (sorted by stars).
+- **📄 Papers with Code** — academic datasets referenced in scientific publications (server proxy, no CORS).
 
-Filtre par source, langue ou domaine en temps réel. Total accessible : **+100k datasets**.
+Filter by source, language or domain in real time. Total accessible: **+100k datasets**.
 
-Les téléchargements tournent **en arrière-plan** : tu peux en lancer plusieurs à la fois et suivre leur statut dans l'interface sans bloquer quoi que ce soit.
+Downloads run **in the background**: you can launch several at once and track their status in the interface without blocking anything.
 
-👉 **[Voir la liste complète des Datasets disponibles](DATASETS.md)**
+👉 **[See the full list of available Datasets](DATASETS.md)**
 
-Tu peux aussi **ajouter tes propres textes** : mets n'importe quel fichier `.txt` dans `data/en/` ou `data/fr/`.
+You can also **add your own texts**: put any `.txt` file in `data/en/` or `data/fr/`.
 
 ---
 
-### 2. Entraîne le tokenizer *(une seule fois)*
+### 2. Train the tokenizer *(once only)*
 
 ```bash
 python src/tokenizer.py
 ```
 
-~5–10 minutes. Une barre de progression s'affiche pendant l'encodage :
+~5–10 minutes. A progress bar is shown during encoding:
 
 ```
-[████████████░░░░░░░] 62.5%  (9.3/15.0M mots)
+[████████████░░░░░░░] 62.5%  (9.3/15.0M words)
 ```
 
-Résultat : `tokenizer.json`.
+Result: `tokenizer.json`.
 
-> Avec char-level, 256 tokens ≈ 50 mots. Avec BPE, 256 tokens ≈ **180 mots**. Même modèle, 3× plus de contexte.
+> With char-level, 256 tokens ≈ 50 words. With BPE, 256 tokens ≈ **180 words**. Same model, 3× more context.
 
 ---
 
-### 3. Lance tout
+### 3. Launch everything
 
 ```bash
 python go.py
 ```
 
-Le programme détecte ton matériel et propose une config :
+The program detects your hardware and suggests a config:
 
-| Preset | GPU requis | Params | |
-|--------|-----------|--------|-|
-| 🐢 NANO | CPU ou < 4 Go | ~2M | pour commencer |
-| 🚀 SMALL | 4–6 Go | ~10M | bon équilibre |
-| ⚡ MEDIUM | 6–8 Go | ~40M | rapport qualité/temps optimal |
-| 🧠 LARGE | 12+ Go | ~85M | pour les patients |
-| 🔧 CUSTOM | — | toi qui choisis | avec explications à chaque param |
+| Preset | GPU required | Params | |
+|--------|-------------|--------|-|
+| 🐢 NANO | CPU or < 4 GB | ~2M | to get started |
+| 🚀 SMALL | 4–6 GB | ~10M | good balance |
+| ⚡ MEDIUM | 6–8 GB | ~40M | best quality/time ratio |
+| 🧠 LARGE | 12+ GB | ~85M | for the patient |
+| 🔧 CUSTOM | — | you choose | with explanations for each param |
 
-Puis tu choisis la durée :
+Then you choose the duration:
 
 ```
 Minutes [auto] >
 ```
 
-- **Entrée** → s'arrête tout seul à convergence
-- **Un nombre** → calcule les étapes, affiche l'heure de fin
+- **Enter** → stops automatically at convergence
+- **A number** → calculates steps, shows estimated end time
 
-Pendant l'entraînement, un **bouton flottant** apparaît sur ton bureau. Il affiche le modèle en cours et l'étape actuelle, et t'ouvre le dashboard en un clic. Il disparaît automatiquement quand l'entraînement est terminé.
+During training, a **floating button** appears on your desktop. It shows the current model and step, and opens the dashboard with one click. It disappears automatically when training is done.
 
 ---
 
-### 4. Parle avec ton IA
+### 4. Talk to your AI
 
 ```bash
 python src/generate.py
 ```
 
 ```
-Toi > The future of artificial intelligence
-IA  > The future of artificial intelligence is now being explored...
+You > The future of artificial intelligence
+AI  > The future of artificial intelligence is now being explored...
 
-t=0.5 → prévisible    t=1.5 → créatif    n=200 → longueur    q → quitter
+t=0.5 → predictable    t=1.5 → creative    n=200 → length    q → quit
 ```
 
 ---
 
-## Le Dashboard
+## The Dashboard
 
-Le dashboard s'ouvre automatiquement au lancement de `go.py`. Tu peux aussi y accéder via le bouton flottant pendant l'entraînement.
+The dashboard opens automatically when you launch `go.py`. You can also access it via the floating button during training.
 
-Il affiche en temps réel (via `monitor.py` sur le port 8001) :
+It displays in real time (via `monitor.py` on port 8001):
 
-- RAM utilisée / totale, VRAM GPU, température, CPU
-- Courbes de `train_loss` et `val_loss`
-- Étape actuelle, vitesse d'entraînement
-- Niveau de protection actif
+- Used / total RAM, GPU VRAM, temperature, CPU
+- `train_loss` and `val_loss` curves
+- Current step, training speed
+- Active protection level
 
-Le bouton **📚 Ouvrir la Bibliothèque** du dashboard ouvre `library.html` — la bibliothèque complète de datasets avec téléchargements en arrière-plan.
+The **📚 Open Library** button in the dashboard opens `library.html` — the full dataset library with background downloads.
 
-> `monitor.py` tourne silencieusement. L'affichage terminal en boucle est désactivé pour ne pas entrer en conflit avec les logs de l'entraînement — tout est visible dans le dashboard.
+> `monitor.py` runs silently. The looping terminal display is disabled to avoid conflicting with training logs — everything is visible in the dashboard.
 
 ---
 
-## Interpréter tes résultats
+## Interpreting your results
 
-| Val Loss | Perplexité | Ce que ça veut dire |
-|----------|-----------|---------------------|
-| > 5.0 | > 148 | L'IA apprend les bases |
-| 3.0 – 5.0 | 20 – 148 | Ça progresse |
-| 2.0 – 3.0 | 7 – 20 | Le texte commence à être cohérent |
-| < 2.0 | < 7 | Très bon — GPT-2 small (117M) tourne autour de 3.1 |
+| Val Loss | Perplexity | What it means |
+|----------|-----------|---------------|
+| > 5.0 | > 148 | AI is learning the basics |
+| 3.0 – 5.0 | 20 – 148 | Making progress |
+| 2.0 – 3.0 | 7 – 20 | Text starts to be coherent |
+| < 2.0 | < 7 | Very good — GPT-2 small (117M) sits around 3.1 |
 
-> Si `val_loss` monte alors que `train_loss` descend : **overfitting** — l'IA mémorise au lieu de comprendre. Solution : augmente `dropout` ou ajoute des données.
+> If `val_loss` rises while `train_loss` drops: **overfitting** — the AI is memorizing instead of understanding. Fix: increase `dropout` or add more data.
 
-👉 **[Guide complet des paramètres](PARAMETRES.md)**
+👉 **[Full parameter guide](PARAMETRES.md)**
 
 ---
 
 <details>
-<summary><b>📊 Comparaison avec les alternatives</b></summary>
+<summary><b>📊 Comparison with alternatives</b></summary>
 <br>
 
-| Fonctionnalité | 🧠 WishAI | nanoGPT / minGPT | LitGPT | GPT-NeoX | Axolotl | DeepSpeed |
+| Feature | 🧠 WishAI | nanoGPT / minGPT | LitGPT | GPT-NeoX | Axolotl | DeepSpeed |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Objectif** | Apprentissage + UI | Éducatif | Ingénierie | Échelle industrielle | Fine-tuning LoRA | Distribué multi-GPU |
-| **Dashboard temps réel** | ✅ Local | ❌ Terminal | ⚠️ Cloud payant | ❌ | ❌ W&B externe | ❌ W&B externe |
-| **Bibliothèque de datasets** | ✅ 135 curatés + 100k+ (HF/GitHub/PwC) | ❌ | ❌ | ❌ | ⚠️ Manuel | ❌ |
-| **Protection VRAM & OOM** | ✅ Auto + Accumulation | ❌ Crash | ✅ CLI | ❌ | ⚠️ Manuel | ⚠️ Manuel |
-| **Téléchargements en arrière-plan** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Early stopping** | ✅ Auto | ❌ Temps fixe | ❌ Manuel | ❌ | ⚠️ Config YAML | ❌ |
-| **Niveau requis** | Débutants | Développeurs | Ingénieurs ML | Labos de recherche | Praticiens ML | Chercheurs |
+| **Goal** | Learning + UI | Educational | Engineering | Industrial scale | LoRA fine-tuning | Multi-GPU distributed |
+| **Real-time dashboard** | ✅ Local | ❌ Terminal | ⚠️ Paid cloud | ❌ | ❌ External W&B | ❌ External W&B |
+| **Dataset library** | ✅ 135 curated + 100k+ (HF/GitHub/PwC) | ❌ | ❌ | ❌ | ⚠️ Manual | ❌ |
+| **VRAM & OOM protection** | ✅ Auto + Accumulation | ❌ Crash | ✅ CLI | ❌ | ⚠️ Manual | ⚠️ Manual |
+| **Background downloads** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Early stopping** | ✅ Auto | ❌ Fixed time | ❌ Manual | ❌ | ⚠️ YAML config | ❌ |
+| **Required level** | Beginners | Developers | ML Engineers | Research labs | ML practitioners | Researchers |
 
-**nanoGPT / minGPT** — parfaits pour comprendre les maths d'un Transformer. Pas d'interface, aucune protection VRAM ni d'accumulation de gradients par défaut, pas d'early stopping.
+**nanoGPT / minGPT** — great for understanding Transformer math. No interface, no VRAM protection or gradient accumulation by default, no early stopping.
 
-**LitGPT** — optimisations de pointe, pensé CLI. Pour un dashboard il faut leur cloud payant.
+**LitGPT** — cutting-edge optimizations, CLI-focused. For a dashboard you need their paid cloud.
 
-**GPT-NeoX** — fait pour 64 GPU en parallèle. Inutilisable sur une machine solo.
+**GPT-NeoX** — built for 64 GPUs in parallel. Unusable on a solo machine.
 
-**Axolotl** — outil de fine-tuning (LoRA/QLoRA) sur des LLMs existants. Pas pour construire un GPT depuis zéro.
+**Axolotl** — fine-tuning tool (LoRA/QLoRA) on existing LLMs. Not for building a GPT from scratch.
 
-**DeepSpeed** — entraînement distribué à très grande échelle. Configs JSON complexes, clusters multi-GPU requis.
+**DeepSpeed** — very large scale distributed training. Complex JSON configs, multi-GPU clusters required.
 
 </details>
 
 ---
 
 <details>
-<summary><b>🛡️ Protections automatiques — la feature que personne n'a</b></summary>
+<summary><b>🛡️ Automatic protections — the feature nobody else has</b></summary>
 <br>
 
-Ton PC ne peut pas mourir pendant l'entraînement. À chaque lancement, tu choisis un niveau de protection parmi quatre — le niveau est sauvegardé dans `config.json` et réutilisé automatiquement.
+Your PC cannot die during training. At each launch, you choose a protection level from four — the level is saved in `config.json` and reused automatically.
 
-**4 niveaux disponibles**
+**4 available levels**
 
-| Niveau | Pour qui | Alerte RAM | Pause RAM | Critique RAM / °C |
-|--------|----------|-----------|-----------|-------------------|
-| **Minim** | Machine puissante (> 32 Go) | 85% | 90% | 95% / 90°C |
-| **Standard** ← défaut | 16–32 Go | 75% | 82% | 92% / 90°C |
-| **Protection** | PC moyen ou laptop (8–16 Go) | 70% | 78% | 85% / 90°C |
-| **Max** | PC ancien ou très limité (< 8 Go) | 60% | 70% | 80% / 89°C |
+| Level | For whom | RAM alert | RAM pause | Critical RAM / °C |
+|-------|---------|-----------|-----------|-------------------|
+| **Minim** | Powerful machine (> 32 GB) | 85% | 90% | 95% / 90°C |
+| **Standard** ← default | 16–32 GB | 75% | 82% | 92% / 90°C |
+| **Protection** | Average PC or laptop (8–16 GB) | 70% | 78% | 85% / 90°C |
+| **Max** | Old or very limited PC (< 8 GB) | 60% | 70% | 80% / 89°C |
 
-**3 phases par niveau — l'entraînement ne s'arrête JAMAIS définitivement**
+**3 phases per level — training NEVER stops permanently**
 
-| Phase | Déclencheur | Ce qui se passe |
-|-------|------------|-----------------|
-| **1 — Alerte** | RAM dépasse le seuil alerte | Message console + ralentissement automatique entre chaque itération |
-| **2 — Pause** | RAM dépasse le seuil pause | L'entraînement se met en pause et attend en mémoire. `monitor.py` surveille et envoie le signal de reprise dès que la RAM redescend |
-| **3 — Critique** | RAM ou température dépasse le seuil critique | Checkpoint sauvegardé, arrêt propre. `monitor.py` surveille les conditions. `go.py` relance automatiquement depuis le checkpoint dès que c'est bon |
+| Phase | Trigger | What happens |
+|-------|---------|--------------|
+| **1 — Alert** | RAM exceeds alert threshold | Console message + automatic slowdown between iterations |
+| **2 — Pause** | RAM exceeds pause threshold | Training pauses and waits in memory. `monitor.py` watches and sends resume signal when RAM drops |
+| **3 — Critical** | RAM or temperature exceeds critical threshold | Checkpoint saved, clean stop. `monitor.py` monitors conditions. `go.py` automatically restarts from checkpoint when conditions are met |
 
-**Autres protections toujours actives**
+**Other always-active protections**
 
-| Situation | Ce qui se passe |
-|-----------|----------------|
-| VRAM > 85% | Arrêt propre + sauvegarde |
-| Ctrl+C | Arrêt propre + sauvegarde |
-| PC qui s'éteint | Checkpoint toutes les N étapes — reprend au prochain lancement |
+| Situation | What happens |
+|-----------|-------------|
+| VRAM > 85% | Clean stop + save |
+| Ctrl+C | Clean stop + save |
+| PC shuts down | Checkpoint every N steps — resumes on next launch |
 
-Pour changer de niveau : supprime `config.json` et relance `go.py`.
+To change level: delete `config.json` at the project root and relaunch `go.py`.
 
 </details>
 
 ---
 
 <details>
-<summary><b>🔬 Architecture Transformer</b></summary>
+<summary><b>🔬 Transformer Architecture</b></summary>
 <br>
 
 ```
-[Tokens d'entrée]
+[Input Tokens]
        ↓
  Token Embedding + Position Embedding
        ↓
 ┌──────────────────────────────────┐
-│  × N couches (4 à 16 selon preset) │
+│  × N layers (4 to 16 by preset)  │
 │                                  │
-│  LayerNorm → Multi-Head Attention │  ← chaque token regarde les autres
-│           + connexion résiduelle  │
+│  LayerNorm → Multi-Head Attention │  ← each token looks at others
+│           + residual connection   │
 │                                  │
-│  LayerNorm → Feed-Forward (×4)   │  ← raisonnement local
-│           + connexion résiduelle  │
+│  LayerNorm → Feed-Forward (×4)   │  ← local reasoning
+│           + residual connection   │
 └──────────────────────────────────┘
        ↓
-  LayerNorm → Linear → Softmax → Token prédit
+  LayerNorm → Linear → Softmax → Predicted token
 ```
 
-Même architecture que GPT-2, en plus petit. Tout est commenté ligne par ligne dans le code.
+Same architecture as GPT-2, just smaller. Everything is commented line by line in the code.
 
 </details>
 
 ---
 
 <details>
-<summary><b>🗂️ Structure des fichiers</b></summary>
+<summary><b>🗂️ File structure</b></summary>
 <br>
 
 ```
 wishai/
-├── go.py               ← lance tout en une commande ← COMMENCE ICI
-├── dashboard.html      ← interface du dashboard (métriques temps réel)
-├── library.html        ← bibliothèque de datasets (téléchargements)
-├── config.json         ← niveau de protection choisi (créé au 1er lancement)
-├── control.json        ← communication entre go.py / nanogpt_bpe / monitor
-├── DATASETS.md         ← liste complète des datasets disponibles
-├── PARAMETRES.md       ← guide expert des paramètres d'entraînement
-├── src/                ← tous les scripts Python
-│   ├── nanogpt_bpe.py  ← modèle + entraînement (cœur du projet)
-│   ├── tokenizer.py    ← tokenizer BPE from scratch (avec barre de progression)
-│   ├── generate.py     ← génération interactive
-│   ├── telecharger.py  ← téléchargement de données (CLI + interface web)
-│   ├── require.py      ← installation automatique des dépendances
-│   ├── protection.py   ← seuils des 4 niveaux de protection
-│   ├── dashboard.py    ← serveur HTTP local (dashboard + bibliothèque + API)
-│   ├── monitor.py      ← serveur métriques HTTP (port 8001) + watchdog
-│   └── btn_dashboard.py← bouton flottant — apparaît pendant l'entraînement
-├── assets/             ← screenshots / GIFs pour le README
-├── cache/              ← cache Python (__pycache__) — local au projet
-├── data/               ← tes données d'entraînement (texte brut/nettoyé)
-├── tokenizer.json      ← tokenizer entraîné (généré par src/tokenizer.py)
+├── go.py               ← launches everything in one command ← START HERE
+├── dashboard.html      ← dashboard interface (real-time metrics)
+├── library.html        ← dataset library (downloads)
+├── config.json         ← chosen protection level (created on first launch)
+├── control.json        ← communication between go.py / nanogpt_bpe / monitor
+├── DATASETS.md         ← full list of available datasets
+├── PARAMETRES.md       ← expert guide to training parameters
+├── src/                ← all Python scripts
+│   ├── nanogpt_bpe.py  ← model + training (core of the project)
+│   ├── tokenizer.py    ← BPE tokenizer from scratch (with progress bar)
+│   ├── generate.py     ← interactive generation
+│   ├── telecharger.py  ← data download (CLI + web interface)
+│   ├── require.py      ← automatic dependency installation
+│   ├── protection.py   ← thresholds for the 4 protection levels
+│   ├── dashboard.py    ← local HTTP server (dashboard + library + REST API)
+│   ├── monitor.py      ← HTTP metrics server (port 8001) + watchdog
+│   └── btn_dashboard.py← floating button — appears during training
+├── assets/             ← screenshots / GIFs for the README
+├── cache/              ← Python cache (__pycache__) — local to project
+├── data/               ← your training data (raw/cleaned text)
+├── tokenizer.json      ← trained tokenizer (generated by src/tokenizer.py)
 └── model/
-    └── <nom>/          ← un dossier par modèle (créé automatiquement)
-        ├── modele.pt       ← modèle final pour generate.py
-        ├── modele.safetensors ← modèle final pour l'export (poids purs)
-        ├── checkpoint.pt   ← reprise possible
-        ├── log_active.json ← données temps réel du dashboard
-        └── tokenizer.json  ← tokenizer utilisé pour ce modèle
+    └── <name>/         ← one folder per model (created automatically)
+        ├── modele.pt           ← final model for generate.py
+        ├── modele.safetensors  ← final model for export (pure weights)
+        ├── checkpoint.pt       ← resumable checkpoint
+        ├── log_active.json     ← real-time dashboard data
+        └── tokenizer.json      ← tokenizer used for this model
 ```
-
-#### Les dossiers vitaux
-* **`data/`** : Stocke toutes les données d'entraînement. Les téléchargements depuis la bibliothèque atterrissent ici automatiquement.
-* **`model/`** : Stocke tous les modèles IA créés (poids sauvegardés à chaque checkpoint ou à la fin).
-* **`cache/`** : Réservé au `__pycache__` Python. Rien de l'App Data système — tout reste local au projet.
-
-#### Les fichiers de configuration
-* **`config.json`** : Enregistre le niveau de protection choisi. Supprime-le pour réafficher le menu au prochain lancement.
-* **`control.json`** : Le "talkie-walkie" du projet. `go.py`, `nanogpt_bpe.py` et `monitor.py` communiquent via ce fichier — pause, reprise, arrêt critique, tout passe par là.
-
-#### Les fichiers de documentation
-* **`DATASETS.md`** : Liste complète des 50+ datasets disponibles, organisés par catégorie.
-* **`PARAMETRES.md`** : Guide expert expliquant chaque paramètre d'entraînement (batch_size, learning_rate, dropout, etc.).
 
 </details>
 
 ---
 
 <details>
-<summary><b>⚙️ Architecture interne — comment les composants communiquent</b></summary>
+<summary><b>⚙️ Internal architecture — how components communicate</b></summary>
 <br>
 
-Quand tu lances `python go.py`, quatre processus démarrent :
+When you run `python go.py`, four processes start:
 
 ```
-go.py (chef d'orchestre)
-  ├── monitor.py        → port 8001  (métriques système en temps réel)
-  ├── dashboard.py      → port auto  (sert dashboard.html + library.html + API REST)
-  ├── btn_dashboard.py  → tkinter    (bouton flottant, surveille log_active.json)
-  └── nanogpt_bpe.py   → terminal   (l'entraînement lui-même)
+go.py (orchestrator)
+  ├── monitor.py        → port 8001  (real-time system metrics)
+  ├── dashboard.py      → auto port  (serves dashboard.html + library.html + REST API)
+  ├── btn_dashboard.py  → tkinter    (floating button, watches log_active.json)
+  └── nanogpt_bpe.py   → terminal   (the training itself)
 ```
 
-**`dashboard.py` — serveur HTTP complet**
+**`dashboard.py` — full HTTP server**
 
-`dashboard.py` n'est pas juste un lanceur de navigateur : c'est un serveur HTTP avec une API REST complète.
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/dashboard.html` | GET | Monitoring interface |
+| `/library.html` | GET | Dataset library |
+| `/api/ping` | GET | Checks server is online |
+| `/api/downloads` | GET | Status of all ongoing downloads |
+| `/api/download` | POST | Starts a background download |
 
-| Route | Méthode | Description |
-|-------|---------|-------------|
-| `/dashboard.html` | GET | Interface de monitoring |
-| `/library.html` | GET | Bibliothèque de datasets |
-| `/api/ping` | GET | Vérifie que le serveur est en ligne |
-| `/api/downloads` | GET | Statut de tous les téléchargements en cours |
-| `/api/download` | POST | Lance un téléchargement en arrière-plan |
-
-Quand tu cliques **Télécharger** dans `library.html`, le navigateur envoie un POST à `/api/download`. `dashboard.py` lance `telecharger.py` dans un thread séparé et répond immédiatement. Tu peux poller `/api/downloads` pour suivre le statut (`running` / `done` / `error:N`).
-
-**`control.json` — communication inter-processus**
+**`control.json` — inter-process communication**
 
 ```json
 {"commande": "pause", "raison": "RAM 82%", "timestamp": 1718700000.0}
 ```
 
-`nanogpt_bpe.py` lit ce fichier à chaque itération. `monitor.py` l'écrit quand les conditions de reprise sont réunies. `go.py` le lit après chaque run pour décider de relancer ou non.
+`nanogpt_bpe.py` reads this file at every iteration. `monitor.py` writes it when resume conditions are met. `go.py` reads it after each run to decide whether to restart or not.
 
 </details>
 
@@ -419,38 +400,50 @@ Quand tu cliques **Télécharger** dans `library.html`, le navigateur envoie un 
 <summary><b>❓ FAQ</b></summary>
 <br>
 
-**L'entraînement s'arrête tout seul, c'est cassé ?**
-Non. En mode automatique, il s'arrête quand la val_loss ne bouge plus depuis 5 évaluations. C'est la convergence.
+**Training stops on its own, is it broken?**
+No. In auto mode, it stops when val_loss hasn't moved for 5 evaluations. That's convergence.
 
-**Je veux reprendre un entraînement arrêté.**
-Relance `python go.py` avec le même nom de modèle. Le checkpoint est détecté automatiquement.
+**I want to resume a stopped training.**
+Relaunch `python go.py` with the same model name. The checkpoint is detected automatically.
 
-**Le texte généré est du charabia.**
-C'est normal au début. Avec val_loss > 4, l'IA apprend encore les structures de base. Laisse tourner.
+**The generated text is gibberish.**
+That's normal at first. With val_loss > 4, the AI is still learning basic structures. Let it run.
 
-**Je peux ajouter mes propres données ?**
-Oui. N'importe quel fichier `.txt` UTF-8 dans `data/en/` ou `data/fr/`. Une phrase par ligne c'est bien, pas obligatoire.
+**Can I add my own data?**
+Yes. Any UTF-8 `.txt` file in `data/en/` or `data/fr/`. One sentence per line is fine, not required.
 
-**Je veux changer le niveau de protection.**
-Supprime `config.json` à la racine du projet et relance `go.py`. Le menu s'affiche à nouveau.
+**I want to change the protection level.**
+Delete `config.json` at the project root and relaunch `go.py`. The menu appears again.
 
-**Le bouton flottant n'apparaît pas.**
-Il ne s'affiche que quand un entraînement est détecté (lit `model/*/log_active.json`). S'il n'apparaît pas du tout, vérifie que `tkinter` est disponible : `python -c "import tkinter"`.
+**The floating button doesn't appear.**
+It only shows when training is detected (reads `model/*/log_active.json`). If it never appears, check that `tkinter` is available: `python -c "import tkinter"`.
 
-**Je veux télécharger un dataset HuggingFace que je ne trouve pas dans la liste.**
-Ouvre la bibliothèque (bouton dans le dashboard ou `python src/telecharger.py`), onglet **Recherche HuggingFace**, tape un mot-clé. Tu as accès aux 150 000+ datasets du Hub en direct.
+**I want to download a HuggingFace dataset not in the list.**
+Open the library (button in the dashboard or `python src/telecharger.py`), **HuggingFace Search** tab, type a keyword. You have access to all 150,000+ Hub datasets live.
 
-**Est-ce que je peux vendre le modèle que j'ai entraîné ?**
-Oui. Le modèle t'appartient entièrement. La licence ne s'applique qu'au code.
+**Can I sell the model I trained?**
+Yes. The model is entirely yours. The license only applies to the code.
 
 </details>
 
 ---
 
-## Licence
+## License
 
 **WishAI Personal Use License v1.0**
 
-✅ Utilisation gratuite — personnelle, éducative, recherche  
-✅ Modification et partage autorisés (avec attribution)  
-✅ Les modèles que tu entraînes t'appartiennent — fais-en ce que tu veux
+✅ Free to use — personal, educational, research
+✅ Modification and sharing allowed (with attribution)
+✅ Models you train are yours — do whatever you want with them
+❌ Cannot sell this software without written permission
+❌ Cannot claim authorship of this project
+
+See [LICENSE](LICENSE) for the full terms.
+
+---
+
+<div align="center">
+
+Built by Liam — learned from scratch.
+
+</div>
