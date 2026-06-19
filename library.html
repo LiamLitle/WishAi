@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📚 Bibliothèque de Données — WishAI</title>
+<style>
+:root {
+  --bg0:#0d1117;--bg1:#161b22;--bg2:#21262d;--bg3:#30363d;
+  --text:#e6edf3;--muted:#8b949e;--dim:#484f58;
+  --blue:#58a6ff;--purple:#bc8cff;--green:#3fb950;
+  --yellow:#e3b341;--red:#f85149;--border:rgba(255,255,255,0.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg0);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow-y:scroll;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 60% 50% at 10% 20%,rgba(88,166,255,0.05) 0%,transparent 60%),
+             radial-gradient(ellipse 50% 60% at 90% 80%,rgba(188,140,255,0.05) 0%,transparent 60%);}
+
+/* TOPBAR */
+.topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:16px;
+  padding:0 28px;height:60px;background:rgba(13,17,23,0.9);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);}
+.topbar-logo{font-size:1.1rem;font-weight:700;
+  background:linear-gradient(90deg,var(--blue),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;flex-shrink:0;}
+.topbar-sep{width:1px;height:22px;background:var(--bg3);flex-shrink:0;}
+
+/* Source pills */
+.source-pills{display:flex;gap:6px;flex-wrap:nowrap;}
+.pill{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;
+  font-size:0.83rem;font-weight:600;cursor:pointer;transition:all 0.2s;
+  background:transparent;border:1px solid var(--bg3);color:var(--muted);}
+.pill:hover{color:var(--text);border-color:var(--dim);}
+.pill.active-hf{color:#FFD21E;background:rgba(255,210,30,0.1);border-color:rgba(255,210,30,0.3);}
+.pill.active-gh{color:#e6edf3;background:rgba(230,237,243,0.08);border-color:rgba(230,237,243,0.25);}
+.pill.active-pw{color:var(--purple);background:rgba(188,140,255,0.1);border-color:rgba(188,140,255,0.3);}
+.pill.active-sel{color:var(--green);background:rgba(63,185,80,0.1);border-color:rgba(63,185,80,0.3);}
+
+.topbar-back{margin-left:auto;display:flex;align-items:center;gap:8px;padding:6px 14px;
+  background:var(--bg2);border:1px solid var(--bg3);border-radius:8px;
+  color:var(--muted);font-size:0.82rem;text-decoration:none;transition:all 0.2s;flex-shrink:0;}
+.topbar-back:hover{background:var(--bg3);color:var(--text);}
+
+/* LAYOUT */
+.page-layout{display:flex;flex-direction:column;min-height:calc(100vh - 60px);
+  position:relative;z-index:1;padding:24px 32px;max-width:1400px;margin:0 auto;}
+
+/* SEARCH BAR */
+.search-row{display:flex;gap:10px;align-items:center;margin-bottom:20px;}
+.search-wrap{position:relative;flex:1;}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);
+  color:var(--dim);font-size:1rem;pointer-events:none;}
+#search-input{width:100%;padding:12px 16px 12px 44px;
+  background:var(--bg1);border:1px solid var(--border);
+  border-radius:10px;color:var(--text);font-size:0.95rem;outline:none;transition:border-color 0.2s;}
+#search-input:focus{border-color:var(--blue);}
+#search-input::placeholder{color:var(--dim);}
+.filter-selects{display:flex;gap:8px;}
+.custom-select{padding:11px 28px 11px 12px;
+  background:var(--bg1) url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22%238b949e%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M7%2010l5%205%205-5z%22%2F%3E%3C%2Fsvg%3E") no-repeat right 8px center;
+  border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.85rem;
+  appearance:none;cursor:pointer;outline:none;min-width:130px;transition:border-color 0.2s;}
+.custom-select:focus{border-color:var(--blue);}
+.sort-select{display:none;}
+.sort-select.visible{display:block;}
+
+/* SUGGESTIONS */
+.sugg-row{display:none;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:16px;}
+.sugg-row.visible{display:flex;}
+.sugg-label{font-size:0.78rem;color:var(--muted);font-weight:500;}
+.sugg-btn{background:var(--bg2);border:1px solid var(--bg3);color:var(--muted);
+  padding:4px 12px;border-radius:12px;font-size:0.78rem;cursor:pointer;transition:all 0.2s;}
+.sugg-btn:hover{background:rgba(88,166,255,0.1);border-color:rgba(88,166,255,0.3);color:var(--blue);}
+
+/* RESULTS HEADER */
+.results-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.results-title{font-size:1.05rem;font-weight:600;display:flex;align-items:center;gap:10px;}
+.results-count{font-size:0.75rem;background:var(--bg2);color:var(--muted);padding:3px 10px;border-radius:20px;}
+.loading-indicator{display:none;font-size:0.85rem;color:var(--yellow);align-items:center;gap:6px;}
+.loading-indicator.visible{display:flex;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:14px;height:14px;border:2px solid rgba(227,179,65,0.3);border-top-color:var(--yellow);border-radius:50%;animation:spin 0.7s linear infinite;}
+
+/* SOURCE BADGE on cards */
+.src-badge{display:inline-flex;align-items:center;gap:4px;font-size:0.68rem;font-weight:700;
+  padding:2px 8px;border-radius:10px;letter-spacing:0.02em;}
+.src-badge.sel{background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);color:var(--green);}
+.src-badge.hf{background:rgba(255,210,30,0.1);border:1px solid rgba(255,210,30,0.3);color:#FFD21E;}
+.src-badge.gh{background:rgba(230,237,243,0.07);border:1px solid rgba(230,237,243,0.2);color:var(--muted);}
+.src-badge.pw{background:rgba(188,140,255,0.1);border:1px solid rgba(188,140,255,0.3);color:var(--purple);}
+
+/* GRID & CARDS */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
+.ds-card{background:var(--bg1);border:1px solid var(--border);
+  border-radius:12px;padding:20px;transition:all 0.2s ease;
+  display:flex;flex-direction:column;gap:12px;}
+.ds-card:hover{border-color:rgba(88,166,255,0.3);transform:translateY(-3px);
+  box-shadow:0 10px 24px rgba(0,0,0,0.25);}
+.ds-card-header{display:flex;align-items:flex-start;gap:12px;}
+.ds-icon{font-size:1.5rem;width:42px;height:42px;display:flex;align-items:center;justify-content:center;
+  background:var(--bg2);border-radius:10px;flex-shrink:0;}
+.ds-info h3{font-size:0.93rem;font-weight:600;margin-bottom:3px;line-height:1.3;word-break:break-all;}
+.ds-desc{font-size:0.79rem;color:var(--muted);line-height:1.45;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}
+.ds-tags{display:flex;flex-wrap:wrap;gap:5px;}
+.tag{font-size:0.7rem;padding:3px 8px;border-radius:6px;font-weight:500;display:inline-flex;align-items:center;gap:3px;}
+.tag-lang{background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.2);color:var(--blue);}
+.tag-dom{background:rgba(188,140,255,0.1);border:1px solid rgba(188,140,255,0.2);color:var(--purple);}
+.tag-stat{background:var(--bg2);border:1px solid var(--bg3);color:var(--dim);}
+.tag-gated{background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.2);color:var(--red);}
+.ds-actions{display:flex;gap:8px;align-items:center;margin-top:auto;padding-top:12px;border-top:1px solid var(--border);}
+.size-wrap{display:flex;align-items:center;background:var(--bg2);border:1px solid var(--bg3);
+  border-radius:8px;overflow:hidden;flex:1;transition:border-color 0.2s;}
+.size-wrap:focus-within{border-color:var(--blue);}
+.size-wrap input{flex:1;background:transparent;border:none;outline:none;
+  color:var(--text);font-size:0.85rem;padding:8px 10px;min-width:0;font-family:inherit;}
+.size-wrap span{padding:8px 10px 8px 0;font-size:0.8rem;color:var(--muted);}
+.dl-btn{display:flex;align-items:center;gap:6px;padding:8px 16px;
+  background:rgba(88,166,255,0.12);border:1px solid rgba(88,166,255,0.25);
+  border-radius:8px;color:var(--blue);font-size:0.85rem;font-weight:600;
+  cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.dl-btn:hover:not(:disabled){background:rgba(88,166,255,0.25);border-color:var(--blue);}
+.dl-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.dl-btn.downloading{background:rgba(227,179,65,0.15);border-color:rgba(227,179,65,0.4);color:var(--yellow);}
+.dl-btn.done{background:rgba(63,185,80,0.15);border-color:rgba(63,185,80,0.4);color:var(--green);}
+.dl-btn.error{background:rgba(248,81,73,0.15);border-color:rgba(248,81,73,0.3);color:var(--red);}
+.link-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;
+  background:transparent;border:1px solid var(--bg3);border-radius:8px;
+  color:var(--muted);font-size:0.82rem;cursor:pointer;transition:all 0.2s;text-decoration:none;white-space:nowrap;}
+.link-btn:hover{background:var(--bg2);color:var(--text);border-color:var(--dim);}
+.progress-bar{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;
+  margin-top:-6px;margin-bottom:6px;display:none;}
+.progress-bar.active{display:block;}
+.progress-inner{height:100%;width:0%;background:linear-gradient(90deg,var(--blue),var(--purple));transition:width 0.3s;}
+
+/* SECTION DIVIDER */
+.section-title{font-size:0.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:0.08em;padding:8px 0 12px;margin-top:8px;display:flex;align-items:center;gap:10px;}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* BANNERS */
+#no-server-banner{display:none;margin-bottom:16px;padding:12px 18px;
+  background:rgba(227,179,65,0.1);border:1px solid rgba(227,179,65,0.3);
+  border-radius:10px;font-size:0.84rem;color:var(--yellow);
+  display:flex;align-items:center;gap:10px;}
+#no-server-banner.visible{display:flex;}
+#server-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--yellow);}
+.dl-btn.offline{opacity:0.4;cursor:not-allowed;}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted);grid-column:1/-1;}
+.empty-state .icon{font-size:3rem;margin-bottom:12px;}
+
+/* TOAST */
+#toast-container{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:10px;z-index:9999;}
+.toast{padding:12px 18px;border-radius:10px;font-size:0.85rem;max-width:340px;
+  backdrop-filter:blur(12px);animation:toastIn 0.3s ease,toastOut 0.3s ease 4s forwards;
+  box-shadow:0 8px 24px rgba(0,0,0,0.4);}
+.toast.success{background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.3);color:var(--green);}
+.toast.error{background:rgba(248,81,73,0.15);border:1px solid rgba(248,81,73,0.3);color:var(--red);}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateY(8px)}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">🧠 WishAI</div>
+  <div class="topbar-sep"></div>
+  <div class="source-pills">
+    <button class="pill active-sel" id="pill-sel" onclick="setSource('sel')">📌 Notre Sélection</button>
+    <button class="pill" id="pill-hf"  onclick="setSource('hf')">🤗 HuggingFace</button>
+    <button class="pill" id="pill-gh"  onclick="setSource('gh')">🐙 GitHub</button>
+    <button class="pill" id="pill-pw"  onclick="setSource('pw')">📄 Papers with Code</button>
+  </div>
+  <a href="dashboard.html" class="topbar-back">← Dashboard</a>
+</div>
+
+<div class="page-layout">
+  <div id="no-server-banner"><div id="server-status-dot"></div><span>Serveur Python non actif — les téléchargements sont désactivés. Lance <code style="background:rgba(0,0,0,0.3);padding:1px 6px;border-radius:4px;">python go.py</code> pour les activer.</span></div>
+
+  <!-- SEARCH ROW -->
+  <div class="search-row">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Rechercher un dataset..." oninput="onSearch()" onkeydown="if(event.key==='Enter') triggerSearch()" />
+    </div>
+    <div class="filter-selects">
+      <select id="filter-lang" class="custom-select" onchange="triggerSearch()">
+        <option value="all">🌍 Langue</option>
+      </select>
+      <select id="filter-domain" class="custom-select" onchange="triggerSearch()">
+        <option value="all">📂 Domaine</option>
+      </select>
+      <select id="sort-select" class="custom-select sort-select" onchange="triggerSearch()">
+        <option value="downloads">Plus téléchargés</option>
+        <option value="likes">Mieux notés</option>
+        <option value="stars">⭐ Stars</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- SUGGESTIONS -->
+  <div class="sugg-row" id="sugg-row">
+    <span class="sugg-label">Suggestions :</span>
+    <button class="sugg-btn" onclick="quickSearch('medical')">🏥 Médical</button>
+    <button class="sugg-btn" onclick="quickSearch('legal')">⚖️ Droit</button>
+    <button class="sugg-btn" onclick="quickSearch('python code')">💻 Code Python</button>
+    <button class="sugg-btn" onclick="quickSearch('astronomy')">🌌 Astronomie</button>
+    <button class="sugg-btn" onclick="quickSearch('finance')">💰 Finance</button>
+    <button class="sugg-btn" onclick="quickSearch('translation french')">🇫🇷 Traduction FR</button>
+    <button class="sugg-btn" onclick="quickSearch('dialogue chat')">🗣️ Dialogue</button>
+    <button class="sugg-btn" onclick="quickSearch('scientific papers')">🔬 Science</button>
+  </div>
+
+  <div class="results-header">
+    <div class="results-title">
+      <span id="source-label">Notre Sélection</span>
+      <span class="results-count" id="results-count">0</span>
+    </div>
+    <div class="loading-indicator" id="loader">
+      <div class="spinner"></div> Recherche en cours...
+    </div>
+  </div>
+
+  <div class="cards-grid" id="cards-grid"></div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// ─── STATE ────────────────────────────────────
+let LOCAL_DATA  = [];
+let serverOnline = false;
+let currentSrc  = 'sel';
+let debounceTimer = null;
+
+const PILL_CLASSES = {sel:'active-sel',hf:'active-hf',gh:'active-gh',pw:'active-pw'};
+const SRC_LABELS   = {
+  sel:'Notre Sélection',
+  hf:'HuggingFace — 150 000+ datasets',
+  gh:'GitHub Datasets',
+  pw:'Papers with Code'
+};
+
+// ─── SOURCE SWITCH ────────────────────────────
+function setSource(src) {
+  currentSrc = src;
+  ['sel','hf','gh','pw'].forEach(s => {
+    const p = document.getElementById('pill-'+s);
+    p.className = 'pill' + (s === src ? ' '+PILL_CLASSES[s] : '');
+  });
+  document.getElementById('source-label').textContent = SRC_LABELS[src];
+
+  // Sort select visible only for API sources
+  document.getElementById('sort-select').classList.toggle('visible', src !== 'sel');
+  // Suggestions visible for API sources
+  document.getElementById('sugg-row').classList.toggle('visible', src !== 'sel');
+  // Lang/domain only for local
+  document.getElementById('filter-lang').style.display   = src === 'sel' ? '' : 'none';
+  document.getElementById('filter-domain').style.display = src === 'sel' ? '' : 'none';
+
+  const q = document.getElementById('search-input').value.trim();
+  if (src === 'sel') {
+    renderLocal();
+  } else if (q) {
+    triggerSearch();
+  } else {
+    document.getElementById('cards-grid').innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Tape un mot-clé pour rechercher sur ${SRC_LABELS[src]}.</p></div>`;
+    document.getElementById('results-count').textContent = '0';
+  }
+}
+
+// ─── SEARCH ORCHESTRATOR ─────────────────────
+function onSearch() {
+  if (currentSrc === 'sel') {
+    renderLocal();
+    return;
+  }
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(triggerSearch, 500);
+}
+
+function triggerSearch() {
+  if (currentSrc === 'sel') { renderLocal(); return; }
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) {
+    document.getElementById('cards-grid').innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Tape un mot-clé pour rechercher.</p></div>`;
+    document.getElementById('results-count').textContent = '0';
+    return;
+  }
+  if (currentSrc === 'hf') searchHF(q);
+  else if (currentSrc === 'gh') searchGitHub(q);
+  else if (currentSrc === 'pw') searchPapersWithCode(q);
+}
+
+function quickSearch(q) {
+  document.getElementById('search-input').value = q;
+  triggerSearch();
+}
+
+// ─── LOCAL ────────────────────────────────────
+async function loadLocalData() {
+  try {
+    const all  = await (await fetch('/src/datasets.json?ts='+Date.now())).json();
+    LOCAL_DATA = all.filter(d => d.curated === true);
+  } catch(e) { LOCAL_DATA = []; }
+  buildLocalFilters();
+  renderLocal();
+}
+
+function buildLocalFilters() {
+  const langs = new Set(); const doms = new Set();
+  LOCAL_DATA.forEach(d => { langs.add(d.flag+' '+d.lang); doms.add(d.domain); });
+  const ls = document.getElementById('filter-lang');
+  Array.from(langs).sort().forEach(l => {
+    const o = document.createElement('option');
+    o.value = l.split(' ').slice(1).join(' '); o.textContent = l; ls.appendChild(o);
+  });
+  const ds = document.getElementById('filter-domain');
+  Array.from(doms).sort().forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = '📂 '+d; ds.appendChild(o);
+  });
+}
+
+function renderLocal() {
+  const q     = document.getElementById('search-input').value.toLowerCase().trim();
+  const langF = document.getElementById('filter-lang').value;
+  const domF  = document.getElementById('filter-domain').value;
+  const list  = LOCAL_DATA.filter(d => {
+    const mq = !q || d.nom.toLowerCase().includes(q) || (d.desc||'').toLowerCase().includes(q);
+    const ml = langF === 'all' || d.lang === langF;
+    const md = domF  === 'all' || d.domain === domF;
+    return mq && ml && md;
+  });
+  document.getElementById('results-count').textContent = list.length;
+  drawCards(list.map(d => ({
+    id: d.raw ? d.raw_id : d.id,
+    nom: d.nom, desc: d.desc,
+    tagLang: d.flag+' '+d.lang, tagDom: d.domain,
+    icon: domIcon(d.domain), sval: d.sval||200,
+    hf_lang: d.hf_lang, isRaw: !!d.raw, canDL: true,
+    badge: '<span class="src-badge sel">📌 Notre Sélection</span>',
+    extraTags: d.gated ? ['<span class="tag tag-gated">⚠️ Compte HF</span>'] : [],
+    link: null,
+  })));
+}
+
+// ─── HUGGINGFACE API ─────────────────────────
+async function searchHF(q) {
+  const sort = document.getElementById('sort-select').value === 'stars' ? 'downloads' : document.getElementById('sort-select').value;
+  setLoading(true);
+  try {
+    const data = await (await fetch('https://huggingface.co/api/datasets?search='+encodeURIComponent(q)+'&sort='+sort+'&limit=30&full=true')).json();
+    setLoading(false);
+    document.getElementById('results-count').textContent = data.length;
+    drawCards(data.map(d => {
+      let langTag='🌍 Multi'; let hf_lang='multi'; let domTag='Général';
+      if (d.tags) {
+        for (const t of d.tags) { if(t.startsWith('language:')){ hf_lang=t.split(':')[1]; langTag='🌍 '+hf_lang.toUpperCase(); break; } }
+        for (const t of d.tags) { if(t.startsWith('task_categories:')){ domTag=t.split(':')[1].replace(/-/g,' '); break; } }
+      }
+      const dl = d.downloads>=1000 ? Math.floor(d.downloads/1000)+'k' : String(d.downloads||0);
+      return {
+        id: d.id, nom: d.id.split('/').pop(),
+        desc: (d.description||'Dataset sur HuggingFace Hub.').slice(0,200),
+        tagLang: langTag, tagDom: domTag,
+        icon: '🤗', sval: 200, hf_lang, isRaw: true, canDL: true,
+        badge: '<span class="src-badge hf">🤗 HuggingFace</span>',
+        extraTags: ['<span class="tag tag-stat">⬇ '+dl+'</span>'],
+        link: 'https://huggingface.co/datasets/'+d.id,
+      };
+    }));
+  } catch(e) { setLoading(false); showToast('Erreur API HuggingFace','error'); }
+}
+
+// ─── GITHUB API ──────────────────────────────
+async function searchGitHub(q) {
+  setLoading(true);
+  try {
+    const sort = document.getElementById('sort-select').value === 'downloads' ? 'stars' :
+                 document.getElementById('sort-select').value === 'likes' ? 'stars' : 'stars';
+    const url  = 'https://api.github.com/search/repositories?q='+encodeURIComponent(q+' dataset')+'&sort=stars&per_page=30';
+    const res  = await fetch(url, {headers:{'Accept':'application/vnd.github.v3+json'}});
+    if (!res.ok) throw new Error('GitHub API: '+res.status);
+    const data = await res.json();
+    setLoading(false);
+    const items = data.items || [];
+    document.getElementById('results-count').textContent = items.length;
+    if (items.length === 0) {
+      document.getElementById('cards-grid').innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Aucun dépôt trouvé sur GitHub.</p></div>`;
+      return;
+    }
+    drawCards(items.map(r => {
+      const stars = r.stargazers_count >= 1000 ? Math.floor(r.stargazers_count/1000)+'k' : String(r.stargazers_count);
+      const lang  = r.language ? '💻 '+r.language : '📦 Data';
+      return {
+        id: r.full_name, nom: r.name,
+        desc: r.description || 'Dépôt GitHub : '+r.full_name,
+        tagLang: lang, tagDom: r.language || 'Data',
+        icon: '🐙', sval: 200, hf_lang: 'en', isRaw: false, canDL: false,
+        badge: '<span class="src-badge gh">🐙 GitHub</span>',
+        extraTags: ['<span class="tag tag-stat">⭐ '+stars+'</span>'],
+        link: r.html_url,
+      };
+    }));
+  } catch(e) { setLoading(false); showToast('Erreur API GitHub: '+e.message,'error'); }
+}
+
+// ─── PAPERS WITH CODE ────────────────────────
+async function searchPapersWithCode(q) {
+  setLoading(true);
+  try {
+    // Proxy via dashboard.py — paperswithcode.com bloque le CORS navigateur
+    const url  = '/api/pwc?q='+encodeURIComponent(q)+'&page_size=30';
+    const data = await (await fetch(url)).json();
+    setLoading(false);
+    const items = data.results || [];
+    document.getElementById('results-count').textContent = items.length;
+    if (items.length === 0) {
+      document.getElementById('cards-grid').innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Aucun dataset trouvé sur Papers with Code.</p></div>`;
+      return;
+    }
+    drawCards(items.map(d => ({
+      id: d.name, nom: d.name,
+      desc: (d.abstract||d.description||'Dataset référencé sur Papers with Code.').slice(0,200),
+      tagLang: '📄 Académique', tagDom: 'Recherche',
+      icon: '📄', sval: 200, hf_lang: 'en', isRaw: false, canDL: false,
+      badge: '<span class="src-badge pw">📄 Papers w/ Code</span>',
+      extraTags: d.paper_count ? ['<span class="tag tag-stat">📄 '+d.paper_count+' papiers</span>'] : [],
+      link: 'https://paperswithcode.com/dataset/'+d.name.toLowerCase().replace(/\s+/g,'-'),
+    })));
+  } catch(e) { setLoading(false); showToast('Erreur API Papers with Code','error'); }
+}
+
+// ─── DRAW CARDS ───────────────────────────────
+function domIcon(d) {
+  return {"Encyclopédie":"📖","Web":"🌐","Littérature":"📚","Programmation":"💻",
+    "Forum":"💬","Science":"🔬","Médecine":"⚕️","Instructions":"🤖",
+    "Dialogues":"🗣️","Traduction":"🔄","Éducation":"🎓","Philosophie":"🧠",
+    "Actualités":"📰","Mathématiques":"🔢"}[d]||"📄";
+}
+
+function drawCards(list) {
+  const grid = document.getElementById('cards-grid');
+  grid.innerHTML = '';
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Aucun dataset trouvé.</p></div>`;
+    return;
+  }
+  list.forEach(d => {
+    const sid  = d.id.replace(/[^a-zA-Z0-9]/g,'_');
+    const card = document.createElement('div');
+    card.className = 'ds-card';
+    const actions = d.canDL ? `
+      <div class="ds-actions">
+        <div class="size-wrap"><input type="number" id="size-${sid}" value="${d.sval}" min="1"><span>Mo</span></div>
+        <button class="dl-btn${serverOnline?'':' offline'}" id="btn-${sid}" onclick="handleDL('${d.id}','${sid}',${d.isRaw},'${d.hf_lang}')" ${serverOnline?'':'disabled title="Lance python go.py pour activer les téléchargements"'}>⬇ Télécharger</button>
+        ${d.link ? `<a class="link-btn" href="${d.link}" target="_blank">↗</a>` : ''}
+      </div>` : `
+      <div class="ds-actions">
+        <a class="link-btn" href="${d.link||'#'}" target="_blank" style="flex:1;justify-content:center;">↗ Voir le projet</a>
+      </div>`;
+    card.innerHTML = `
+      <div class="ds-card-header">
+        <div class="ds-icon">${d.icon}</div>
+        <div class="ds-info">
+          <h3>${d.nom}</h3>
+          <div class="ds-desc">${d.desc}</div>
+        </div>
+      </div>
+      <div class="ds-tags">
+        ${d.badge}
+        <span class="tag tag-lang">${d.tagLang}</span>
+        <span class="tag tag-dom">${d.tagDom}</span>
+        ${d.extraTags.join('')}
+      </div>
+      <div class="progress-bar" id="prog-${sid}"><div class="progress-inner" id="prog-in-${sid}"></div></div>
+      ${actions}`;
+    grid.appendChild(card);
+  });
+}
+
+// ─── DOWNLOAD ────────────────────────────────
+async function handleDL(realId, safeId, isRaw, targetLang) {
+  if (!serverOnline) { showToast('Le serveur Python n\'est pas actif.','error'); return; }
+  const mo     = document.getElementById('size-'+safeId).value||200;
+  const btn    = document.getElementById('btn-'+safeId);
+  const prog   = document.getElementById('prog-'+safeId);
+  const progIn = document.getElementById('prog-in-'+safeId);
+  btn.disabled=true; btn.className='dl-btn downloading'; btn.textContent='⏳ En cours...';
+  prog.classList.add('active'); progIn.style.width='50%';
+  try {
+    const r = await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({dataset_id:realId,mo:parseInt(mo),is_raw_hf:isRaw,lang:targetLang})});
+    if (r.ok) {
+      progIn.style.width='100%'; btn.className='dl-btn done'; btn.textContent='✅ Lancé !';
+      showToast('Téléchargement de '+realId+' ('+mo+' Mo) lancé.','success');
+      setTimeout(()=>{btn.className='dl-btn';btn.textContent='⬇ Télécharger';btn.disabled=false;prog.classList.remove('active');},4000);
+    } else throw new Error('Erreur serveur');
+  } catch(e) {
+    btn.className='dl-btn error'; btn.textContent='❌ Erreur';
+    showToast(e.message,'error');
+    setTimeout(()=>{btn.className='dl-btn';btn.textContent='⬇ Télécharger';btn.disabled=false;prog.classList.remove('active');},3000);
+  }
+}
+
+// ─── UTILS ───────────────────────────────────
+function setLoading(v) {
+  document.getElementById('loader').classList.toggle('visible',v);
+  if (v) document.getElementById('cards-grid').innerHTML='';
+}
+
+async function checkServer() {
+  const wasOnline = serverOnline;
+  try { serverOnline = (await fetch('/api/ping',{signal:AbortSignal.timeout(1500)})).ok; }
+  catch { serverOnline = false; }
+  document.getElementById('no-server-banner').classList.toggle('visible', !serverOnline);
+  // Si l'état a changé, mettre à jour tous les boutons Télécharger
+  if (wasOnline !== serverOnline) _updateDlBtns();
+}
+
+function _updateDlBtns() {
+  document.querySelectorAll('.dl-btn').forEach(function(btn) {
+    if (btn.classList.contains('downloading') || btn.classList.contains('done')) return;
+    if (serverOnline) {
+      btn.classList.remove('offline');
+      btn.disabled = false;
+      btn.title = '';
+    } else {
+      btn.classList.add('offline');
+      btn.disabled = true;
+      btn.title = 'Lance python go.py pour activer les téléchargements';
+    }
+  });
+}
+
+function showToast(msg,type) {
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div'); t.className='toast '+type; t.textContent=msg; c.appendChild(t);
+  setTimeout(()=>t.remove(),4000);
+}
+
+// ─── INIT ────────────────────────────────────
+checkServer();
+setInterval(checkServer, 5000);
+loadLocalData();
+// Init UI state
+document.getElementById('filter-lang').style.display='';
+document.getElementById('filter-domain').style.display='';
+document.getElementById('sort-select').classList.remove('visible');
+</script>
+</body>
+</html>

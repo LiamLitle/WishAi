@@ -1,0 +1,12 @@
+# Dépendances principales
+torch>=2.0.0
+numpy
+safetensors
+psutil
+requests
+datasets
+huggingface_hub
+
+# Options (surveillance GPU)
+gputil
+pynvml

@@ -1,0 +1,64 @@
+# ================================================================
+#  Mini-GPT — .gitignore
+#  Fichiers à NE PAS publier sur GitHub
+# ================================================================
+
+# ── Modèles (dossiers trackés, fichiers lourds ignorés) ─────────
+# model/ et model/<nom>/ sont trackés (structure visible sur GitHub)
+# Seuls les fichiers générés (poids, checkpoints) sont ignorés
+model/**/*.pt
+model/**/*.safetensors
+model/**/bpe_cache.pt
+model/**/log_active.json
+model/active.json
+
+# ── Tokenizer (généré par tokenizer.py) ─────────────────────────
+tokenizer.json
+
+# ── Données (dossiers trackés, sources ignorées) ─────────────────
+# data/, data/en/, data/fr/, data/multi/ sont trackés
+# Seuls les fichiers texte téléchargés sont ignorés (trop lourds)
+data/**/*.txt
+data/**/*.bin
+data/cc_temp/
+
+# ── Historique UI ───────────────────────────────────────────────
+historique_data.json
+
+# ── Python ──────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ── Environnements virtuels ──────────────────────────────────────
+.venv/
+.venv312/
+venv/
+env/
+ENV/
+
+# ── Éditeurs / OS ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Fichiers runtime (générés à l'exécution) ────────────────────
+control.json
+config.json
+session.json
+
+# ── Cache Python (généré automatiquement) ───────────────────────
+cache/
+
+# ── Fichiers de test / debug ─────────────────────────────────────
+test_*.py
+*_test.py
+tests/
+debug/
+tmp/
+*.tmp

@@ -1,0 +1,73 @@
+WishAI Personal Use License — Version 1.0
+Copyright (c) 2026 Liam
+
+================================================================
+IN SHORT (human version):
+  ✅ You can use this project for free
+  ✅ You can modify and adapt it to your needs
+  ✅ You can share it, show it, fork it
+  ✅ AI models YOU train are entirely yours
+     — you can do whatever you want with them, including selling them
+  ❌ You cannot sell THIS software, or a product built
+     directly on its code, without written permission
+  ❌ You cannot republish this software claiming it as
+     your own creation
+  ❌ You cannot claim to be the author or creator of this project
+================================================================
+
+FULL LICENSE:
+
+1. LICENSE AGREEMENT
+   By using, copying, modifying or distributing this software,
+   you agree to the terms of this license.
+
+2. GRANTED RIGHTS
+   Subject to the conditions below, the author grants you
+   a worldwide, royalty-free, non-exclusive right to:
+     a) Use this software for personal, educational
+        or research purposes
+     b) Copy and modify the software for your own use
+     c) Distribute copies of the original or modified software
+        provided this license is included
+
+3. COMMERCIAL AND APPROPRIATION RESTRICTIONS
+   The following are PROHIBITED without prior written permission from the author:
+     a) Selling this software or a copy thereof
+     b) Offering this software (original or modified) as
+        a paid product or service
+     c) Integrating this software into a commercial product whose
+        main value relies on this code
+     d) Republishing this software (original or modified) on a
+        public platform (GitHub, npm, PyPI, Hugging Face, etc.)
+        presenting it as your own project or creation,
+        without explicitly crediting Liam as the original author and
+        without including this license
+     e) Presenting yourself as the original author or creator of this
+        software, or claiming intellectual ownership of this
+        creation in any way
+
+4. TRAINED MODELS BELONG TO YOU
+   AI model files (.pt, .bin or any other format)
+   that you generate using this software are considered
+   your own work and your exclusive property.
+   You may use, share, modify or sell them freely,
+   without restriction from this license.
+
+5. ATTRIBUTION
+   If you distribute this software or a derivative work, you must:
+     a) Keep this copyright notice
+     b) Clearly mention that the work is based on WishAI
+        and include a link to the original repository
+
+6. DISCLAIMER OF WARRANTY
+   This software is provided "as is", without warranty of any
+   kind, express or implied. The author cannot be held
+   liable for any damages resulting from its use.
+
+7. CONTACT
+   For any commercial use request or questions
+   about this license, open an Issue on the GitHub repository.
+
+================================================================
+Built by Liam — learned from scratch.
+================================================================
