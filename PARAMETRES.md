@@ -1,212 +1,218 @@
-# 🔧 Paramètres de WishAI — Guide Expert
+<div align="right">
 
-Ce fichier explique chaque paramètre de la configuration Expert.
-Reviens ici quand tu as une question sur un paramètre spécifique.
+🇬🇧 English | [🇫🇷 Français](PARAMETRES_FR.md)
 
----
+</div>
 
-## batch_size & grad_accum_steps — L'Accumulation de Gradients
+# 🔧 WishAI Parameters — Expert Guide
 
-À chaque étape, l'IA apprend sur un "lot" d'exemples simultanément.
-`batch_size` = taille du lot chargé en VRAM à la fois.
-Pour éviter l'erreur `CUDA Out of Memory`, on utilise l'**Accumulation de Gradients**.
-
-**Comment ça marche :**
-Avec `batch_size = 4` et `grad_accum_steps = 4` :
-L'IA lit 4 fois un lot de 4 exemples, accumule les erreurs, et fait une seule mise à jour.
-**Batch effectif = 16** — sans faire exploser la VRAM.
-
-**Configurations recommandées :**
-
-| Config | batch_size | grad_accum | Effectif | Profil |
-|--------|-----------|------------|---------|--------|
-| Légère | 4 | 2 | 8 | CPU / < 4 Go VRAM |
-| Standard | 4 | 4 | 16 | 6–8 Go VRAM |
-| Gros modèle | 4 | 8 | 32 | 12+ Go VRAM |
-
-> **Règle d'or :** garde `batch_size` bas (4), augmente `grad_accum_steps` si tu veux plus de stabilité.
+This file explains every parameter in the Expert configuration.
+Come back here whenever you have a question about a specific parameter.
 
 ---
 
-## block_size — La Fenêtre de Contexte
+## batch_size & grad_accum_steps — Gradient Accumulation
 
-Nombre de tokens que l'IA peut lire simultanément pour prédire le suivant. C'est sa mémoire à court terme.
+At each step, the AI learns on a "batch" of examples simultaneously.
+`batch_size` = size of the batch loaded into VRAM at once.
+To avoid `CUDA Out of Memory` errors, we use **Gradient Accumulation**.
 
-| block_size | ≈ mots de contexte | Usage |
+**How it works:**
+With `batch_size = 4` and `grad_accum_steps = 4`:
+The AI reads 4 batches of 4 examples, accumulates the errors, and does a single update.
+**Effective batch = 16** — without blowing up VRAM.
+
+**Recommended configurations:**
+
+| Config | batch_size | grad_accum | Effective | Profile |
+|--------|-----------|------------|-----------|---------|
+| Light | 4 | 2 | 8 | CPU / < 4 GB VRAM |
+| Standard | 4 | 4 | 16 | 6–8 GB VRAM |
+| Large model | 4 | 8 | 32 | 12+ GB VRAM |
+
+> **Golden rule:** keep `batch_size` low (4), increase `grad_accum_steps` for more stability.
+
+---
+
+## block_size — The Context Window
+
+Number of tokens the AI can read simultaneously to predict the next one. It is its short-term memory.
+
+| block_size | ≈ words of context | Usage |
 |---|---|---|
-| 64 | ~45 mots | Très rapide, phrases très courtes |
-| 128 | ~90 mots | Prototypage |
-| 256 | ~180 mots ← | **Bon équilibre** |
-| 512 | ~360 mots | Paragraphes complets |
-| 1024 | ~730 mots | Textes longs, lent |
+| 64 | ~45 words | Very fast, very short sentences |
+| 128 | ~90 words | Prototyping |
+| 256 | ~180 words ← | **Good balance** |
+| 512 | ~360 words | Full paragraphs |
+| 1024 | ~730 words | Long texts, slow |
 
-> Avec BPE, 1 token ≈ 0.7 mot en anglais, ≈ 0.6 mot en français.
+> With BPE, 1 token ≈ 0.7 word in English, ≈ 0.6 word in French.
 
 ---
 
-## n_embd — La Richesse Interne
+## n_embd — Internal Richness
 
-Chaque token est représenté par un vecteur de `n_embd` nombres.
-Plus c'est grand, plus l'IA nuance sa compréhension — mais plus ça coûte en VRAM.
+Each token is represented by a vector of `n_embd` numbers.
+The larger it is, the more the AI nuances its understanding — but the more VRAM it costs.
 
-| Preset | n_embd | Analogie |
+| Preset | n_embd | Analogy |
 |---|---|---|
-| NANO | 128 | Esquisse rapide |
-| SMALL | 256 | Dessin au crayon |
-| MEDIUM | 512 | Peinture détaillée |
+| NANO | 128 | Quick sketch |
+| SMALL | 256 | Pencil drawing |
+| MEDIUM | 512 | Detailed painting |
 | LARGE | 768 | GPT-2 small |
 
-> **Contrainte :** `n_embd` doit être divisible par `n_head`.  
-> Exemple : n_embd=512 → n_head valides : 1, 2, 4, **8**, 16, 32
+> **Constraint:** `n_embd` must be divisible by `n_head`.
+> Example: n_embd=512 → valid n_head values: 1, 2, 4, **8**, 16, 32
 
 ---
 
-## n_head — Les Têtes d'Attention
+## n_head — Attention Heads
 
-Le mécanisme d'attention est divisé en `n_head` têtes parallèles.
-Chaque tête apprend à repérer un type de relation différent dans le texte.
+The attention mechanism is split into `n_head` parallel heads.
+Each head learns to spot a different type of relationship in the text.
 
-**Ce que les têtes apprennent (en pratique) :**
-- Sujets et verbes
-- Pronoms et références (il, elle, ce...)
-- Négations et nuances
-- Relations syntaxiques
-- L'IA décide elle-même — on ne contrôle pas ça
+**What heads learn (in practice):**
+- Subjects and verbs
+- Pronouns and references (he, she, it...)
+- Negations and nuances
+- Syntactic relationships
+- The AI decides itself — we don't control this
 
-**Règle absolue :** `n_embd` divisible par `n_head` sans reste.
+**Absolute rule:** `n_embd` must be divisible by `n_head` with no remainder.
 
 ---
 
-## n_layer — La Profondeur du Réseau
+## n_layer — Network Depth
 
-Nombre de blocs Transformer empilés. Chaque couche raffine la compréhension.
+Number of stacked Transformer blocks. Each layer refines understanding.
 
-| n_layer | Vitesse | Qualité | Recommandé pour |
+| n_layer | Speed | Quality | Recommended for |
 |---|---|---|---|
-| 4 | ⚡ Très rapide | Structures simples | NANO, tests |
-| 6 | ⚡ Rapide | Bon équilibre | SMALL |
-| 8 | 🔄 Moyen | Bien | Usage général |
-| 12 | 🐢 Lent | Relations complexes | MEDIUM, LARGE |
-| 16 | 🐢 Très lent | Très profond | Gros modèles |
+| 4 | ⚡ Very fast | Simple structures | NANO, tests |
+| 6 | ⚡ Fast | Good balance | SMALL |
+| 8 | 🔄 Medium | Good | General use |
+| 12 | 🐢 Slow | Complex relationships | MEDIUM, LARGE |
+| 16 | 🐢 Very slow | Very deep | Large models |
 
 ---
 
-## dropout — Protection contre l'Overfitting
+## dropout — Protection Against Overfitting
 
-À chaque étape, `dropout × 100`% des connexions sont désactivées aléatoirement.
-Cela force l'IA à généraliser plutôt que mémoriser.
+At each step, `dropout × 100`% of connections are randomly disabled.
+This forces the AI to generalize rather than memorize.
 
-| dropout | Effet | Quand l'utiliser |
+| dropout | Effect | When to use |
 |---|---|---|
-| 0.0 | Désactivé | Grands datasets (>1M tokens) |
-| 0.1 | Léger | Bon point de départ |
-| 0.2 | **Recommandé** | Cas général |
-| 0.3 | Fort | Petit dataset, risque d'overfitting |
-| 0.5 | Très fort | Dataset très petit |
+| 0.0 | Disabled | Large datasets (>1M tokens) |
+| 0.1 | Light | Good starting point |
+| 0.2 | **Recommended** | General case |
+| 0.3 | Strong | Small dataset, overfitting risk |
+| 0.5 | Very strong | Very small dataset |
 
 ---
 
-## learning_rate — La Vitesse d'Apprentissage
+## learning_rate — Learning Speed
 
-Contrôle la taille du "pas" lors de chaque mise à jour des paramètres.
+Controls the size of the "step" at each parameter update.
 
-| Valeur | Effet | Usage |
+| Value | Effect | Usage |
 |---|---|---|
-| `1e-3` = 0.001 | Trop grand — instable | Éviter |
-| `3e-4` = 0.0003 | **Standard GPT** | Préentraînement depuis zéro |
-| `1e-4` = 0.0001 | Conservateur | Grands modèles |
-| `1e-5` = 0.00001 | Très petit | Fine-tuning uniquement |
+| `1e-3` = 0.001 | Too large — unstable | Avoid |
+| `3e-4` = 0.0003 | **GPT standard** | Pretraining from scratch |
+| `1e-4` = 0.0001 | Conservative | Large models |
+| `1e-5` = 0.00001 | Very small | Fine-tuning only |
 
-**Symptôme d'un LR trop grand :** `train_loss` remonte ou devient NaN.  
-**Symptôme d'un LR trop petit :** convergence très lente, plateau précoce.
+**Symptom of LR too large:** `train_loss` rises or becomes NaN.
+**Symptom of LR too small:** very slow convergence, early plateau.
 
-> WishAI utilise un **LR scheduler cosinus** : décroissance douce jusqu'à `min_lr = lr × 0.1`.
+> WishAI uses a **cosine LR scheduler**: smooth decay down to `min_lr = lr × 0.1`.
 
 ---
 
-## eval_interval & eval_iters — Fréquence des Mesures
+## eval_interval & eval_iters — Measurement Frequency
 
-`eval_interval` : tous les N pas, calculer la `val_loss`.
-`eval_iters` : nombre de batches utilisés pour estimer la val_loss.
+`eval_interval`: every N steps, calculate the `val_loss`.
+`eval_iters`: number of batches used to estimate val_loss.
 
-| eval_interval | eval_iters | Effet |
+| eval_interval | eval_iters | Effect |
 |---|---|---|
-| 100 | 50 | Dashboard très réactif, ~5% plus lent |
-| 500 | 100 | **Bon équilibre** |
-| 1000 | 200 | Entraînement rapide, courbe moins fine |
+| 100 | 50 | Very reactive dashboard, ~5% slower |
+| 500 | 100 | **Good balance** |
+| 1000 | 200 | Fast training, less detailed curve |
 
 ---
 
-## Comprendre val_loss et train_loss
+## Understanding val_loss and train_loss
 
-**train_loss** — erreur sur les données d'entraînement. Doit descendre.  
-**val_loss** — erreur sur données jamais vues. C'est la vraie mesure de performance.
+**train_loss** — error on training data. Should go down.
+**val_loss** — error on never-seen data. This is the real performance measure.
 
-| Situation | Interprétation | Action |
+| Situation | Interpretation | Action |
 |---|---|---|
-| Les deux descendent | ✅ Apprentissage normal | Continuer |
-| train_loss ↓, val_loss ↑ | ⚠️ Overfitting | Augmenter dropout, ajouter données |
-| Les deux stagnent | 🔄 Convergence | WishAI s'arrête automatiquement |
-| val_loss → NaN | 🚨 LR trop grand | Diviser learning_rate par 3 |
+| Both going down | ✅ Normal learning | Keep going |
+| train_loss ↓, val_loss ↑ | ⚠️ Overfitting | Increase dropout, add data |
+| Both stagnating | 🔄 Convergence | WishAI stops automatically |
+| val_loss → NaN | 🚨 LR too large | Divide learning_rate by 3 |
 
 ---
 
-## Perplexité — Lire les Résultats
+## Perplexity — Reading the Results
 
-`perplexité = e^(val_loss)`
+`perplexity = e^(val_loss)`
 
-Représente "entre combien de mots l'IA hésite" à chaque prédiction.
+Represents "between how many words the AI hesitates" at each prediction.
 
-| val_loss | Perplexité | Interprétation |
+| val_loss | Perplexity | Interpretation |
 |---|---|---|
-| > 5.0 | > 148 | Apprentissage des bases |
-| 3.5–5.0 | 33–148 | Structures émergentes |
-| 2.5–3.5 | 12–33 | Texte commence à être cohérent |
-| 2.0–2.5 | 7–12 | Bon niveau |
+| > 5.0 | > 148 | Learning the basics |
+| 3.5–5.0 | 33–148 | Emerging structures |
+| 2.5–3.5 | 12–33 | Text starts to be coherent |
+| 2.0–2.5 | 7–12 | Good level |
 | < 2.0 | < 7 | Excellent |
 
-> GPT-2 small (117M params) atteint ~3.1 sur WikiText-103.  
-> Preset MEDIUM (~40M params) : viser **2.5–3.5** est réaliste.
+> GPT-2 small (117M params) reaches ~3.1 on WikiText-103.
+> MEDIUM preset (~40M params): targeting **2.5–3.5** is realistic.
 
 ---
 
-## Overfitting — L'Ennemi Silencieux
+## Overfitting — The Silent Enemy
 
-L'overfitting = l'IA mémorise les données au lieu de comprendre le langage.
+Overfitting = the AI memorizes data instead of understanding language.
 
-**Symptômes :**
-- `train_loss` très bas, `val_loss` qui remonte
-- Texte généré répète les phrases d'entraînement mot pour mot
+**Symptoms:**
+- `train_loss` very low, `val_loss` rising
+- Generated text repeats training sentences word for word
 
-**Solutions (par ordre d'efficacité) :**
-1. Ajouter plus de données d'entraînement
-2. Augmenter `dropout` (ex : 0.2 → 0.3)
-3. Réduire la taille du modèle (`n_layer` ou `n_embd`)
-4. Arrêter l'entraînement tôt — WishAI le détecte automatiquement
+**Solutions (by effectiveness):**
+1. Add more training data
+2. Increase `dropout` (e.g. 0.2 → 0.3)
+3. Reduce model size (`n_layer` or `n_embd`)
+4. Stop training early — WishAI detects this automatically
 
 ---
 
-## Checkpoints — Ne Jamais Perdre son Travail
+## Checkpoints — Never Lose Your Work
 
-Un checkpoint = sauvegarde complète (poids + optimizer + étape actuelle).
+A checkpoint = complete save (weights + optimizer + current step).
 
-**Si ton PC s'éteint ou si tu arrêtes l'entraînement :**
-Relance `python go.py` avec le même nom de modèle.
-WishAI détecte le checkpoint et reprend exactement là où il s'était arrêté.
+**If your PC shuts down or you stop training:**
+Relaunch `python go.py` with the same model name.
+WishAI detects the checkpoint and resumes exactly where it left off.
 
-| Fréquence | Effet |
+| Frequency | Effect |
 |---|---|
-| 100 étapes | Très sûr, léger ralentissement |
-| 500 étapes | **Recommandé** |
-| 5000 étapes | Rapide, mais risque de perdre du travail |
+| 100 steps | Very safe, slight slowdown |
+| 500 steps | **Recommended** |
+| 5000 steps | Fast, but risk of losing work |
 
 ---
 
-## Présets Recommandés
+## Recommended Presets
 
-| Preset | n_embd | n_head | n_layer | block_size | Params | VRAM min |
+| Preset | n_embd | n_head | n_layer | block_size | Params | Min VRAM |
 |--------|--------|--------|---------|-----------|--------|---------|
 | 🐢 NANO | 128 | 4 | 4 | 256 | ~2M | CPU |
-| 🚀 SMALL | 256 | 8 | 6 | 256 | ~10M | 4 Go |
-| ⚡ MEDIUM | 512 | 8 | 12 | 512 | ~40M | 6 Go |
-| 🧠 LARGE | 768 | 12 | 12 | 1024 | ~85M | 12 Go |
+| 🚀 SMALL | 256 | 8 | 6 | 256 | ~10M | 4 GB |
+| ⚡ MEDIUM | 512 | 8 | 12 | 512 | ~40M | 6 GB |
+| 🧠 LARGE | 768 | 12 | 12 | 1024 | ~85M | 12 GB |
