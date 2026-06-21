@@ -735,10 +735,24 @@ body {
 
   <!-- ── GRAPHIQUE PERTES ── -->
   <div class="card" style="margin-bottom:14px">
-    <div class="card-title" style="margin-bottom:10px">
-      Courbes de perte &nbsp;·&nbsp; Train <span style="color:#58a6ff">━━</span> &nbsp;Val <span style="color:#bc8cff">╌╌</span>
+    <div class="card-title" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+      <span>Courbes de perte &nbsp;·&nbsp; Train <span style="color:#58a6ff">━━</span> &nbsp;Val <span style="color:#bc8cff">╌╌</span></span>
+      <button onclick="toggleCompare()" id="btn-compare"
+        style="background:#21262d;border:1px solid #30363d;color:#8b949e;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:12px">
+        Comparer les modèles
+      </button>
     </div>
     <div class="chart-wrap"><canvas id="loss-chart"></canvas></div>
+  </div>
+
+  <!-- ── PANNEAU COMPARAISON ── -->
+  <div id="compare-panel" style="display:none" class="card" style="margin-bottom:14px">
+    <div class="card-title" style="margin-bottom:10px;display:flex;justify-content:space-between">
+      <span>Comparaison multi-modèles</span>
+      <button onclick="toggleCompare()" style="background:none;border:none;color:#8b949e;cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div id="compare-status" style="color:#8b949e;font-size:13px;margin-bottom:8px"></div>
+    <div class="chart-wrap"><canvas id="compare-chart"></canvas></div>
   </div>
 
 
@@ -903,6 +917,20 @@ body {
      JAVASCRIPT
 ══════════════════════════════════════════════════════════════ -->
 <script>
+// ─── AUTO-REDIRECT file:// → localhost ─────────────────────────────
+(function() {
+  if (window.location.protocol === 'http:') {
+    try { localStorage.setItem('wishai_port', window.location.port); } catch(e) {}
+    return;
+  }
+  if (window.location.protocol !== 'file:') return;
+  const _p = localStorage.getItem('wishai_port');
+  if (!_p) return;
+  fetch('http://localhost:' + _p + '/api/ping', {mode:'no-cors', signal:AbortSignal.timeout(1000)})
+    .then(function() { window.location.replace('http://localhost:' + _p + '/dashboard.html'); })
+    .catch(function() {});
+})();
+
 // ── Particules idle ────────────────────────────────────────────────
 (function() {
   const container = document.getElementById('idle-dots');
@@ -985,6 +1013,7 @@ let genExpanded = false;
 let appState    = 'idle';
 
 const STALE_MS = 20_000;
+const STARTING_GRACE_MS = 300_000;  // garde l ecran Demarrage sans flasher vers idle
 
 // ── Helpers ────────────────────────────────────────────────────────
 function fmtSec(s) {
@@ -1320,6 +1349,7 @@ function updateDetails(data, hp) {
 
 // ── Suivi de session (détection nouvelle session go.py) ───────────────────
 let lastSessionId = null;
+let sessionStartMs = 0;
 
 async function checkSession() {
   try {
@@ -1331,7 +1361,11 @@ async function checkSession() {
       lastSessionId = sid;
       lastModel = null;   // force reset au prochain fetchLog
       resetDash();
-      applyState('starting');
+      // Ne montrer Demarrage que pour une session RECENTE (go.py vient
+      // de demarrer). Une vieille session.json laissee par un run precedent
+      // ne doit pas flasher l ecran de demarrage.
+      sessionStartMs = (s.ts || 0) * 1000 || Date.now();
+      if ((Date.now() - sessionStartMs) < STARTING_GRACE_MS) applyState('starting');
     }
   } catch {}
 }
@@ -1356,7 +1390,16 @@ async function fetchLog() {
 async function update() {
   const data = await fetchLog();
 
-  if (!data) { applyState('idle'); return; }
+  if (!data) {
+    // Pendant le demarrage (session lancee mais logs pas encore ecrits :
+    // chargement donnees / tokenizer / cache BPE), on garde l ecran
+    // Demarrage au lieu de flasher vers idle.
+    const enDemarrage = appState === 'starting' &&
+                        sessionStartMs > 0 &&
+                        (Date.now() - sessionStartMs) < STARTING_GRACE_MS;
+    if (!enDemarrage) applyState('idle');
+    return;
+  }
 
   const lastUpdateMs = (data.last_update || 0) * 1000;
   const stale = lastUpdateMs > 0 && (Date.now() - lastUpdateMs) > STALE_MS;
@@ -1533,25 +1576,8 @@ async function update() {
   set('last-ref', new Date().toLocaleTimeString('fr'));
 }
 
-// ── monitor.py optionnel ───────────────────────────────────────────
-function tryMonitor() {
-  if (appState === 'idle') return;
-  fetch('http://localhost:8001/')
-    .then(r => r.json())
-    .then(m => {
-      const mem = {
-        vram_go:       m.gpu?.utilise_go  || 0,
-        vram_total_go: m.gpu?.total_go    || 0,
-        vram_pct:      m.gpu?.pct         || 0,
-        ram_go:        m.ram?.utilise_go  || 0,
-        ram_total_go:  m.ram?.total_go    || 0,
-        ram_pct:       m.ram?.pct         || 0,
-        cpu_pct:       m.cpu?.pct         || 0,
-      };
-      updateMem(mem, m.gpu?.temp_c || 0, null, null);
-    })
-    .catch(() => {});
-}
+// ── monitor.py optionnel (conservé pour compatibilité file://) ─────
+function tryMonitor() {}   // remplacé par SSE ci-dessous
 
 // ── Texte généré — expand ──────────────────────────────────────────
 function toggleGen() {
@@ -1560,12 +1586,178 @@ function toggleGen() {
   document.getElementById('gen-btn').textContent = genExpanded ? '↑ Réduire' : '↕ Voir tout';
 }
 
-// ── Boucle ─────────────────────────────────────────────────────────
-update();
-setInterval(update,     3000);
-checkSession();
-setInterval(checkSession, 2000);
-setInterval(tryMonitor, 1000);
+// ── SSE — remplace tous les setInterval ────────────────────────────
+(function() {
+  // Fonctionne uniquement en http: (pas en file://)
+  if (window.location.protocol !== 'http:') {
+    // Fallback polling pour file://
+    update();
+    setInterval(update, 3000);
+    checkSession();
+    setInterval(checkSession, 2000);
+    return;
+  }
+
+  const es = new EventSource('/api/events');
+
+  es.onmessage = function(e) {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'log') {
+        // Simule la réponse de fetchLog()
+        _applyLog(msg.data);
+      } else if (msg.type === 'session') {
+        _applySession(msg.data);
+      } else if (msg.type === 'monitor') {
+        const m = msg.data;
+        const mem = {
+          vram_go:       m.gpu?.utilise_go  || 0,
+          vram_total_go: m.gpu?.total_go    || 0,
+          vram_pct:      m.gpu?.pct         || 0,
+          ram_go:        m.ram?.utilise_go  || 0,
+          ram_total_go:  m.ram?.total_go    || 0,
+          ram_pct:       m.ram?.pct         || 0,
+          cpu_pct:       m.cpu?.pct         || 0,
+        };
+        updateMem(mem, m.gpu?.temp_c || 0, null, null);
+      }
+    } catch {}
+  };
+
+  es.onerror = function() {
+    // SSE coupé → fallback polling
+    es.close();
+    setInterval(update, 3000);
+    setInterval(checkSession, 2000);
+  };
+
+  // Premier rendu immédiat
+  update();
+  checkSession();
+})();
+
+// Wrappers pour appliquer les données reçues par SSE
+function _applyLog(data) {
+  if (!data) { applyState('idle'); return; }
+  // Réutilise la logique de update() mais avec data déjà chargé
+  _applyLogData(data);
+}
+function _applySession(s) {
+  const sid = String(s.id || '');
+  if (sid && sid !== lastSessionId) {
+    lastSessionId = sid;
+    lastModel = null;
+    resetDash();
+    sessionStartMs = (s.ts || 0) * 1000 || Date.now();
+    if ((Date.now() - sessionStartMs) < STARTING_GRACE_MS) applyState('starting');
+  }
+}
+// _applyLogData — extrait de update() pour être appelable par SSE
+function _applyLogData(data) {
+  if (!data) return;
+  applyState('training');
+  const hp = data.hyperparams || {};
+  // ... délègue à la logique existante via update() avec data injecté
+  _lastSseLog = data;
+}
+let _lastSseLog = null;
+// Patch update() pour utiliser _lastSseLog si disponible
+const _updateOrig = update;
+async function update() {
+  if (_lastSseLog) {
+    const data = _lastSseLog;
+    _lastSseLog = null;
+    // Insère data dans le pipeline existant
+    if (!data) { applyState('idle'); return; }
+    const nom = data.nom_modele || data.model_name || null;
+    if (nom && nom !== lastModel) { lastModel = nom; resetDash(); }
+    applyState(data.status === 'terminé' ? 'done' : 'training');
+    updateHyperparams(data.hyperparams || {});
+    updateProgress(data);
+    updateChart(data.steps || []);
+    updateEvents(data);
+    const mem = data.memoire || (data.steps?.length ? data.steps[data.steps.length-1].memoire : null);
+    if (mem) {
+      const hp = data.hyperparams || {};
+      const vl = hp.vram_total_go ? Math.round(hp.vram_total_go * 0.85 * 10) / 10 : null;
+      const rl = hp.ram_total_go  ? Math.round(hp.ram_total_go  * 0.80 * 10) / 10 : null;
+      updateMem(mem, data.temp_gpu || 0, vl, rl);
+    }
+    set('last-ref', new Date().toLocaleTimeString('fr'));
+    return;
+  }
+  return _updateOrig();
+}
+
+// ── Comparaison multi-modèles ──────────────────────────────────────
+let compareChart = null;
+let compareOpen  = false;
+
+function toggleCompare() {
+  compareOpen = !compareOpen;
+  document.getElementById('compare-panel').style.display = compareOpen ? 'block' : 'none';
+  document.getElementById('btn-compare').style.color = compareOpen ? 'var(--blue)' : '#8b949e';
+  if (compareOpen) loadCompare();
+}
+
+async function loadCompare() {
+  const status = document.getElementById('compare-status');
+  status.textContent = 'Chargement...';
+  try {
+    const r = await fetch('/api/models');
+    if (!r.ok) { status.textContent = 'Erreur chargement modèles'; return; }
+    const modeles = await r.json();
+    const noms = Object.keys(modeles);
+    if (noms.length === 0) { status.textContent = 'Aucun modèle trouvé dans model/'; return; }
+    status.textContent = `${noms.length} modèle(s) — cliquer pour actualiser`;
+
+    const COLORS = ['#58a6ff','#bc8cff','#3fb950','#f0883e','#e3b341','#f85149','#79c0ff','#d2a8ff'];
+    const datasets = [];
+    noms.forEach((nom, i) => {
+      const m = modeles[nom];
+      const col = COLORS[i % COLORS.length];
+      datasets.push({
+        label: nom + ' train',
+        data: m.steps.map((s, j) => ({ x: s, y: m.train[j] })),
+        borderColor: col, backgroundColor: col + '18',
+        fill: false, tension: 0.35, pointRadius: 2, borderWidth: 2,
+      });
+      if (m.val.some(v => v != null)) {
+        datasets.push({
+          label: nom + ' val',
+          data: m.steps.map((s, j) => ({ x: s, y: m.val[j] })),
+          borderColor: col, borderDash: [5,3],
+          fill: false, tension: 0.35, pointRadius: 2, borderWidth: 1.5,
+        });
+      }
+    });
+
+    if (compareChart) compareChart.destroy();
+    compareChart = new Chart(
+      document.getElementById('compare-chart').getContext('2d'), {
+      type: 'line',
+      data: { datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        parsing: false,
+        animation: { duration: 300 },
+        plugins: {
+          legend: { labels: { color: '#8b949e', font: { size: 11 }, padding: 12 } },
+          tooltip: { backgroundColor: '#161b22', borderColor: '#30363d', borderWidth: 1,
+                     titleColor: '#e6edf3', bodyColor: '#8b949e', padding: 8, cornerRadius: 6 }
+        },
+        scales: {
+          x: { type: 'linear', ticks: { color: '#8b949e' }, grid: { color: '#1c2128' },
+               title: { display: true, text: 'Étape', color: '#8b949e' } },
+          y: { ticks: { color: '#8b949e' }, grid: { color: '#1c2128' },
+               title: { display: true, text: 'Loss', color: '#8b949e' } }
+        }
+      }
+    });
+  } catch(err) {
+    status.textContent = 'Erreur : ' + err.message;
+  }
+}
 </script>
 </body>
 </html>

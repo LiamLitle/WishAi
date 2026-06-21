@@ -1,13 +1,10 @@
 """\n=================================================================\n  TÉLÉCHARGEUR UNIFIÉ — WishAI by Liam\n  Toutes les sources de données au même endroit.\n=================================================================\n\nSTRUCTURE DES FICHIERS GÉNÉRÉS :\n  data/fr/data.txt     ← données françaises\n  data/en/data.txt     ← données anglaises\n  data/multi/data.txt  ← données multilingues\n  data/data.txt        ← dernier téléchargement (utilisé par nanogpt.py)\n\nSOURCES DISPONIBLES :\n  [1-8]  HuggingFace  (Wikipedia, Wikitext, OpenWebText, OSCAR...)\n  [9-11] Common Crawl (scraping direct du web, 3 bots en parallèle)\n=================================================================\n"""
 
 import os
-import sys
 import re
+import sys
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Centralisation du cache (__pycache__)
-os.environ["PYTHONPYCACHEPREFIX"] = os.path.join(_ROOT, "cache", "pycache")
-sys.pycache_prefix = os.path.join(_ROOT, "cache", "pycache")
 import gzip
 import time
 import shutil
@@ -164,7 +161,7 @@ def combiner_sources(langue=None):
     if len(fichiers) > 1:
         print("\n  Proportions ? (Entrée = égales)")
         print(f"  Tape {len(fichiers)} nombres séparés par espaces.")
-        print(f"  Ex: '70 30' → 70% source 1, 30% source 2")
+        print("  Ex: '70 30' → 70% source 1, 30% source 2")
         prop_str = input("  > ").strip()
         if not prop_str:
             poids = [1.0] * len(fichiers)
@@ -217,8 +214,8 @@ def combiner_sources(langue=None):
 
     print(f"\n{'='*62}")
     print(f"  ✅ data.txt combiné : {taille_finale:.1f} Mo")
-    print(f"  ⚠️  Supprime bpe_cache.pt avant de relancer l'entraînement !")
-    print(f"     Remove-Item data\\en\\bpe_cache.pt")
+    print("  ⚠️  Supprime bpe_cache.pt avant de relancer l'entraînement !")
+    print("     Remove-Item data\\en\\bpe_cache.pt")
     print(f"{'='*62}")
 
 # ================================================================
@@ -245,8 +242,61 @@ def detecter_langue(texte):
     return "en"
 
 def nettoyer_texte(texte):
-    """Supprime les caractères non-latins pour garder un vocab propre."""
-    return "".join(c for c in texte if ord(c) < 0x0250 or c in "\n\t")
+    """
+    Nettoyage qualité Common Crawl — plusieurs passes :
+    1. Supprime les balises HTML résiduelles
+    2. Filtre ligne par ligne : longueur, densité de ponctuation, URLs
+    3. Déduplique les lignes (spam répétitif)
+    4. Retire les caractères non-latins
+    """
+    import re as _re
+
+    # 1. Balises HTML (< ... >) et entités (&amp; &nbsp; etc.)
+    texte = _re.sub(r'<[^>]{1,200}>', ' ', texte)
+    texte = _re.sub(r'&[a-z]{2,6};', ' ', texte)
+
+    # 2. Filtrage ligne par ligne
+    _RE_URL   = _re.compile(r'https?://\S+|www\.\S+', _re.I)
+    _RE_EMAIL = _re.compile(r'\S+@\S+\.\S+')
+    _RE_PONCT = _re.compile(r'[|{}\[\]<>#*_=~^]')
+
+    lignes_ok  = []
+    vues       = set()
+
+    for ligne in texte.splitlines():
+        ligne = ligne.strip()
+
+        # Trop courte (menu, bouton, navigation)
+        if len(ligne) < 40:
+            continue
+
+        # Trop d'URLs → page de liens / pub
+        if len(_RE_URL.findall(ligne)) >= 2:
+            continue
+
+        # Contient un email → RGPD / spam
+        if _RE_EMAIL.search(ligne):
+            continue
+
+        # Densité de ponctuation parasite > 15 % → HTML mal parsé
+        nb_ponct = len(_RE_PONCT.findall(ligne))
+        if nb_ponct / len(ligne) > 0.15:
+            continue
+
+        # Déduplique (lignes répétées = boilerplate / SEO spam)
+        cle = ligne[:80].lower()
+        if cle in vues:
+            continue
+        vues.add(cle)
+
+        lignes_ok.append(ligne)
+
+    texte = "\n".join(lignes_ok)
+
+    # 3. Retire les caractères non-latins (garde \n \t)
+    texte = "".join(c for c in texte if ord(c) < 0x0250 or c in "\n\t")
+
+    return texte
 
 # ================================================================
 # COMMON CRAWL — TÉLÉCHARGEMENT + EXTRACTION (STREAMING)
@@ -254,7 +304,7 @@ def nettoyer_texte(texte):
 
 def get_liste_wet():
     url = f"https://data.commoncrawl.org/crawl-data/{CRAWL_ID}/wet.paths.gz"
-    print(f"  Récupération de la liste des fichiers...")
+    print("  Récupération de la liste des fichiers...")
     r = requests.get(url, stream=True, timeout=30)
     r.raise_for_status()
     contenu = gzip.decompress(r.content).decode("utf-8")
@@ -433,7 +483,7 @@ def telecharger_hf(src, output_file, limite_chars, mode="w"):
         print("❌ Module 'datasets' manquant. Lance : install_data.bat")
         return False
 
-    print(f"  Connexion à HuggingFace...")
+    print("  Connexion à HuggingFace...")
     try:
         if src.get("hf_config"):
             ds = load_dataset(src["hf_path"], src["hf_config"],
@@ -496,9 +546,9 @@ def afficher_categories():
     for i, cat in enumerate(cats, 1):
         print(f"  [{i}] {CATEGORIES[cat]}")
     print("\n  ── Gestion ──")
-    print(f"  [ c]  Combiner les sources (choisir proportions)")
-    print(f"  [ l]  Lister les sources téléchargées")
-    print(f"  [ s]  Supprimer des données (sources, cache, tout)")
+    print("  [ c]  Combiner les sources (choisir proportions)")
+    print("  [ l]  Lister les sources téléchargées")
+    print("  [ s]  Supprimer des données (sources, cache, tout)")
     print("="*62)
     return cats
 
@@ -525,6 +575,73 @@ def demander_mo():
                 return int(val * 1_000_000)
         except:
             print("  ❌ Format invalide. Utilise 'Mo' ou 'Go' (ex: 2 Go).")
+
+def supprimer_donnees():
+    """Supprime des sources téléchargées (ou le data.txt combiné) par langue."""
+    print("\n  ── Suppression de données ──")
+    langues_dispo = []
+    for lang in ["en", "fr", "multi"]:
+        fichiers = lister_sources(lang)
+        data_txt = os.path.join(DATA_ROOT, lang, "data.txt")
+        if fichiers or os.path.exists(data_txt):
+            langues_dispo.append(lang)
+
+    if not langues_dispo:
+        print("  (aucune donnée à supprimer)")
+        return
+
+    for lang in langues_dispo:
+        print(f"\n  {FLAG.get(lang,'')} {lang.upper()} :")
+        afficher_sources_dispo(lang)
+        data_txt = os.path.join(DATA_ROOT, lang, "data.txt")
+        if os.path.exists(data_txt):
+            mo = os.path.getsize(data_txt) / 1_000_000
+            print(f"    [data.txt] {'(combiné)':<40} {mo:.1f} Mo")
+
+    lang = input("\n  Langue à nettoyer (en/fr/multi) > ").strip().lower()
+    if lang not in langues_dispo:
+        print("  ❌ Langue invalide.")
+        return
+
+    fichiers = lister_sources(lang)
+    data_txt = os.path.join(DATA_ROOT, lang, "data.txt")
+    print(f"\n  Que supprimer pour {lang.upper()} ?")
+    print("    [t] tout (sources + data.txt)")
+    print("    [d] seulement data.txt combiné")
+    print("    [numéro] une source précise")
+    cible = input("  Choix > ").strip().lower()
+
+    libere = 0.0
+    sources_dir = os.path.join(DATA_ROOT, lang, "sources")
+
+    if cible == "t":
+        for f in fichiers:
+            chemin = os.path.join(sources_dir, f)
+            libere += os.path.getsize(chemin) / 1_000_000
+            os.remove(chemin)
+        if os.path.exists(data_txt):
+            libere += os.path.getsize(data_txt) / 1_000_000
+            os.remove(data_txt)
+        print(f"  🗑️  Tout supprimé pour {lang.upper()} ({libere:.1f} Mo libérés)")
+    elif cible == "d":
+        if os.path.exists(data_txt):
+            libere = os.path.getsize(data_txt) / 1_000_000
+            os.remove(data_txt)
+            print(f"  🗑️  data.txt supprimé ({libere:.1f} Mo libérés)")
+        else:
+            print("  (aucun data.txt à supprimer)")
+    else:
+        try:
+            idx = int(cible) - 1
+            if 0 <= idx < len(fichiers):
+                chemin = os.path.join(sources_dir, fichiers[idx])
+                libere = os.path.getsize(chemin) / 1_000_000
+                os.remove(chemin)
+                print(f"  🗑️  {fichiers[idx]} supprimé ({libere:.1f} Mo libérés)")
+            else:
+                print("  ❌ Numéro invalide.")
+        except ValueError:
+            print("  ❌ Choix invalide.")
 
 def main():
     cats = afficher_categories()
@@ -568,7 +685,7 @@ def main():
         src = sources_cat[cle]
         print(f"  [{i:>2}]  {src['nom']}")
         
-    print(f"\n  [ q]  Retour")
+    print("\n  [ q]  Retour")
     
     choix_src = input("\n  Dataset > ").strip().lower()
     if choix_src == 'q' or not choix_src:
@@ -606,24 +723,16 @@ def main():
     if os.path.exists(output_file):
         taille = os.path.getsize(output_file) / 1_000_000
         print(f"\n  ⚠️  Source '{slug}.txt' existe déjà ({taille:.1f} Mo)")
-        print(f"  [1] Ajouter à ce fichier source")
-        print(f"  [2] Remplacer ce fichier source")
+        print("  [1] Ajouter à ce fichier source")
+        print("  [2] Remplacer ce fichier source")
         choix_mode = input("  Choix > ").strip()
         if choix_mode == "2":
             mode = "w"
             print("  → Remplacement")
         else:
             mode = "a"
-            print("  → Ajout aux données existantes")
+            print("  -> Ajout")
 
-    print(f"\n{'='*62}")
-    print(f"  Source  : {src['nom']} {flag}")
-    print(f"  Sortie  : {output_file}")
-    print(f"  Mode    : {'AJOUT' if mode == 'a' else 'REMPLACEMENT'}")
-    print(f"  Limite  : {limite/1_000_000:.1f} Mo")
-    print(f"{'='*62}\n")
-
-    debut = time.time()
     ok = False
 
     if src["type"] == "cc":
@@ -631,105 +740,39 @@ def main():
     else:
         ok = telecharger_hf(src, output_file, limite, mode)
 
-    if not ok:
-        print("\n❌ Téléchargement échoué ou aucun texte récupéré.")
-        return
-
-    duree  = time.time() - debut
-    taille = os.path.getsize(output_file) / 1_000_000
-
-    print("\n" + "="*62)
-    print("  ✅ TÉLÉCHARGEMENT TERMINÉ")
-    print(f"  Fichier source : {output_file}  ({taille:.1f} Mo)")
-    print(f"  Durée          : {duree:.0f}s")
-    print("="*62)
-
-    # ── Proposer de combiner maintenant ──
-    print(f"\n  Tu as maintenant ces sources pour '{langue}' :")
-    afficher_sources_dispo(langue)
-    print(f"\n  Veux-tu combiner les sources en data.txt maintenant ?")
-    print(f"  [O] Oui — combiner  [n] Non — je le ferai plus tard")
-    if input("  > ").strip().lower() != "n":
-        combiner_sources(langue)
-
-
-# ================================================================
-# LANCEMENT — supporte le mode CLI (depuis library.html)
-# ================================================================
-
-def cli_download(dataset_id, mo, do_combine, is_raw_hf=False, target_lang="multi"):
-    """\n    Mode silencieux lancé par dashboard.py depuis library.html.\n    Exemple : python telecharger.py --download fr_wiki --mo 500 --combine\n              python telecharger.py --download microsoft/orca-math --mo 200 --is_raw_hf --lang en\n    """
-    if is_raw_hf:
-        src = {
-            "nom": dataset_id.split("/")[-1],
-            "hf": dataset_id,
-            "type": "hf",
-            "cat": target_lang
-        }
-        langue = target_lang
-    else:
-        src = SOURCES.get(dataset_id)
-        if not src:
-            print(f"❌ Dataset '{dataset_id}' inconnu.")
-            sys.exit(1)
-        langue = get_langue_by_cat(src["cat"])
-
-    limite  = int(mo) * 1_000_000
-
-    sources_dir = os.path.join(DATA_ROOT, langue, "sources")
-    os.makedirs(sources_dir, exist_ok=True)
-    slug        = slug_source(src["nom"])
-    output_file = os.path.join(sources_dir, f"{slug}.txt")
-
-    print(f"\n{'='*62}")
-    print(f"  [CLI] Téléchargement automatique depuis la Bibliothèque Web")
-    print(f"  Dataset : {src['nom']}")
-    print(f"  Langue  : {langue}")
-    print(f"  Sortie  : {output_file}")
-    print(f"  Limite  : {mo} Mo")
-    print(f"{'='*62}\n")
-
-    debut = time.time()
-    if src["type"] == "cc":
-        ok = telecharger_common_crawl(output_file, src.get("filtre"), limite)
-    else:
-        ok = telecharger_hf(src, output_file, limite)
-
-    if not ok:
-        print("❌ Téléchargement échoué.")
-        sys.exit(1)
-
-    duree  = time.time() - debut
-    taille = os.path.getsize(output_file) / 1_000_000
-    print(f"\n✅ {taille:.1f} Mo téléchargés en {duree:.0f}s")
-
-    if do_combine:
+    if ok:
         combiner_sources(langue)
 
 
 if __name__ == "__main__":
-    # ─── Mode CLI : python telecharger.py --download <id> --mo <n> [--combine] [--is_raw_hf] [--lang <l>] ───
-    args = sys.argv[1:]
-    if "--download" in args:
-        idx = args.index("--download")
-        dataset_id = args[idx + 1] if idx + 1 < len(args) else ""
+    import argparse
+    parser = argparse.ArgumentParser(description="Telecharger des donnees pour WishAI")
+    parser.add_argument("--download",  default=None,  help="ID de la source (ex: fr_culturax)")
+    parser.add_argument("--mo",        type=int, default=200, help="Mo a telecharger")
+    parser.add_argument("--combine",   action="store_true",   help="Combiner les sources apres dl")
+    parser.add_argument("--is_raw_hf", action="store_true",   help="Dataset HF brut")
+    parser.add_argument("--lang",      default="multi")
+    args = parser.parse_args()
 
-        mo = 200
-        if "--mo" in args:
-            mo_idx = args.index("--mo")
-            try: mo = int(args[mo_idx + 1])
-            except: pass
+    if args.download:
+        if args.download not in SOURCES:
+            print("Source inconnue : " + args.download)
+            sys.exit(1)
+        src    = SOURCES[args.download]
+        langue = get_langue_by_cat(src["cat"])
+        sources_dir  = os.path.join(DATA_ROOT, langue, "sources")
+        os.makedirs(sources_dir, exist_ok=True)
+        slug         = slug_source(src["nom"])
+        output_file  = os.path.join(sources_dir, slug + ".txt")
+        limite       = args.mo * 1_000_000
 
-        do_combine = "--combine" in args
-        is_raw_hf  = "--is_raw_hf" in args
-        
-        lang = "multi"
-        if "--lang" in args:
-            lang_idx = args.index("--lang")
-            if lang_idx + 1 < len(args):
-                lang = args[lang_idx + 1]
+        ok = False
+        if src["type"] == "cc":
+            ok = telecharger_common_crawl(output_file, src.get("filtre"), limite)
+        else:
+            ok = telecharger_hf(src, output_file, limite)
 
-        cli_download(dataset_id, mo, do_combine, is_raw_hf, lang)
+        if ok and args.combine:
+            combiner_sources(langue)
     else:
-        # Mode interactif normal
         main()

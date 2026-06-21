@@ -1,12 +1,9 @@
 # go.py -- lance tout WishAI en une commande
 # python go.py
 
-import os, sys, subprocess, time, json
+import os, sys, subprocess, time, json, webbrowser
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-# Centralisation du cache (__pycache__)
-os.environ["PYTHONPYCACHEPREFIX"] = os.path.join(ROOT, "cache", "pycache")
-sys.pycache_prefix = os.path.join(ROOT, "cache", "pycache")
 SRC  = os.path.join(ROOT, "src")
 
 CONTROL_FILE = os.path.join(ROOT, "control.json")
@@ -21,10 +18,12 @@ def bg(script):
     return subprocess.Popen([sys.executable, os.path.join(SRC, script)], cwd=ROOT)
 
 def donnees_existent():
+    def non_vide(p):
+        return os.path.exists(p) and os.path.getsize(p) > 1024
     for langue in ["en", "fr", "multi"]:
-        if os.path.exists(os.path.join(ROOT, "data", langue, "data.txt")):
+        if non_vide(os.path.join(ROOT, "data", langue, "data.txt")):
             return True
-    return os.path.exists(os.path.join(ROOT, "data", "data.txt"))
+    return non_vide(os.path.join(ROOT, "data", "data.txt"))
 
 def lire_control():
     try:
@@ -36,20 +35,36 @@ def lire_control():
 def ecrire_control(commande, **extra):
     data = {"commande": commande, "timestamp": time.time()}
     data.update(extra)
-    with open(CONTROL_FILE, "w", encoding="utf-8") as f:
+    # Ecriture atomique : on ecrit dans un .tmp puis on remplace d'un coup,
+    # pour qu'un lecteur ne tombe jamais sur un control.json a moitie ecrit.
+    tmp = CONTROL_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
+    os.replace(tmp, CONTROL_FILE)
 
 
 print("\n  WishAI\n")
 
-# dependances en premier
+# dependances (installe uniquement ce qui manque, < 1s si deja installe)
 run("require.py")
 
-# -- Niveau de protection -----------------------------------------------
-sys.path.insert(0, SRC)
-from protection import NIVEAUX, DEFAUT
+# -- Demarrage anticipe du serveur dashboard ----------------------------
+_dash_url_file = os.path.join(ROOT, "dashboard_url.json")
+if os.path.exists(_dash_url_file):
+    try: os.remove(_dash_url_file)
+    except Exception: pass
+_dash_proc = bg("dashboard.py")
 
-# Le système utilise par défaut le niveau STANDARD défini dans protection.py
+def _wait_dash_url(timeout=10):
+    for _ in range(timeout * 4):
+        if os.path.exists(_dash_url_file):
+            try:
+                with open(_dash_url_file, encoding="utf-8") as _f:
+                    return json.load(_f)
+            except Exception:
+                pass
+        time.sleep(0.25)
+    return None
 
 # initialise control.json a "run"
 ecrire_control("run")
@@ -75,21 +90,26 @@ else:
     print("  Veux-tu ouvrir la bibliotheque pour en rajouter ? [o/N]")
     choix_dl = input("  Choix [N] > ").strip().lower()
     if choix_dl == "o":
-        run_args("telecharger.py", [])
+        print("\n  Demarrage du serveur en cours...")
+        _dash_info = _wait_dash_url(timeout=10)
+        if _dash_info and _dash_info.get("lib_url"):
+            webbrowser.open(_dash_info["lib_url"])
+        else:
+            _lib = os.path.join(ROOT, "library.html")
+            webbrowser.open("file:///" + _lib.replace("\\", "/"))
+        print("\n  Bibliotheque ouverte dans le navigateur.")
+        input("  Appuie sur Entree quand tu as fini... ")
         print("\n  Retour a go.py...")
 
-# tokenizer
-tok = os.path.join(ROOT, "tokenizer.json")
-if not os.path.exists(tok):
-    print("\n  tokenizer.json introuvable -- lancement du tokenizer...")
-    print()
-    run("tokenizer.py")
+# tokenizer -- se reentraine automatiquement si le dataset a change
+print("\n  Verification du tokenizer...")
+print()
+run("tokenizer.py")
 
-# monitor, dashboard, bouton -- en arriere-plan
+# monitor -- en arriere-plan (dashboard deja lance plus haut)
 bg("monitor.py")
-bg("dashboard.py")
-bg("btn_dashboard.py")
-time.sleep(2)
+_wait_dash_url(timeout=8)
+time.sleep(1)
 
 # -- Signal nouvelle session pour le dashboard -------------------------
 with open(os.path.join(ROOT, "session.json"), "w", encoding="utf-8") as _sf:
@@ -105,4 +125,11 @@ while True:
 
     if commande == "reprendre":
         print("\n" + "="*56)
-        print("  CONDITIONS OK -- 
+        print("  CONDITIONS OK -- REPRISE DE L'ENTRAINEMENT")
+        print("="*56 + "\n")
+        time.sleep(2)
+        continue
+
+    break
+
+print("\n  Termine. Pour generer du texte : python src/generate.py\n")

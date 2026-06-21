@@ -63,23 +63,18 @@ PRÉREQUIS (à installer une seule fois) :
 
 import math
 import torch
-import torch.nn as nn
-from torch.nn import functional as F
-import os, sys, time, json, shutil, gc, glob
+import os, sys, time, json, gc, glob
 from safetensors.torch import save_file as safe_save_file
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Centralisation du cache (__pycache__)
-os.environ["PYTHONPYCACHEPREFIX"] = os.path.join(_ROOT, "cache", "pycache")
-sys.pycache_prefix = os.path.join(_ROOT, "cache", "pycache")
 
 import re as _re
 import psutil
 import subprocess as _sp
 import signal as _sig
 
-from tokenizer import TokenizerBPE, TOKENIZER_FILE
-
+from tokenizer import TokenizerBPE, TOKENIZER_FILE, VOCAB_SIZE as _VOCAB_SIZE
+from model import WishAI_BPE, ConfigModele
 
 # ================================================================
 #  CONFIGURATIONS PRÊTES À L'EMPLOI (PRESETS)
@@ -148,6 +143,20 @@ PRESETS = {
         "learning_rate"   : 3e-4,
         "nb_params_approx": "~10M",
     },
+    "MINI": {
+        "emoji"           : "⚡",
+        "description"     : "GPU 4-8 Go — 20M params, bon point de départ pour tester",
+        "vram_min_go"     : 4,
+        "batch_size"      : 4,
+        "grad_accum_steps": 4,
+        "block_size"      : 256,
+        "n_embd"          : 384,
+        "n_head"          : 6,
+        "n_layer"         : 10,
+        "dropout"         : 0.15,
+        "learning_rate"   : 3e-4,
+        "nb_params_approx": "~20M",
+    },
     "MEDIUM": {
         "emoji"           : "⚡",
         "description"     : "GPU 6-8 Go — meilleur rapport qualité / ressources",
@@ -178,7 +187,6 @@ PRESETS = {
     },
 }
 
-
 # ================================================================
 #  VÉRIFICATION DU PC
 # ================================================================
@@ -199,6 +207,15 @@ def verifier_pc():
         device  = "cuda"
         print(f"  ✅ GPU      : {gpu_nom}")
         print(f"  ✅ VRAM     : {vram_go:.1f} Go")
+    elif getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
+        # Apple Silicon : memoire unifiee (pas de VRAM dediee).
+        # On estime la part utilisable depuis la RAM systeme pour la reco de preset.
+        gpu_nom = "Apple Silicon (MPS)"
+        ram_totale = psutil.virtual_memory().total / 1e9
+        vram_go = ram_totale * 0.6
+        device  = "mps"
+        print(f"  ✅ GPU      : {gpu_nom}")
+        print(f"  ✅ Mémoire  : unifiée (~{vram_go:.1f} Go utilisables sur {ram_totale:.0f} Go)")
     else:
         gpu_nom = "Pas de GPU (CPU uniquement)"
         vram_go = 0.0
@@ -225,7 +242,6 @@ def verifier_pc():
 
     return device, gpu_nom, vram_go, ram_go, recommande
 
-
 # ================================================================
 #  LIMITES DE SÉCURITÉ MÉMOIRE
 #  Pilotées par le niveau de protection choisi dans go.py.
@@ -247,16 +263,17 @@ _PROT_SEUILS, _PROT_NIVEAU = _charger_seuils(CONFIG_FILE)
 # Flag phase 1 — activé par check_securite(), lu dans la boucle principale
 _ralentir = False
 
-
 def _ecrire_control(commande, **extra):
     data = {"commande": commande, "timestamp": time.time()}
     data.update(extra)
+    # Ecriture atomique (.tmp + os.replace) pour eviter un fichier corrompu.
     try:
-        with open(CONTROL_FILE, "w", encoding="utf-8") as f:
+        tmp = CONTROL_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False)
+        os.replace(tmp, CONTROL_FILE)
     except Exception:
         pass
-
 
 def _lire_control():
     try:
@@ -264,7 +281,6 @@ def _lire_control():
             return json.load(f)
     except Exception:
         return {"commande": "run"}
-
 
 def configurer_limites_memoire(vram_total_go, ram_total_go):
     """Calcule la limite VRAM à 85% du total."""
@@ -274,7 +290,6 @@ def configurer_limites_memoire(vram_total_go, ram_total_go):
     # RAM gérée via pourcentage dans check_securite() — LIMITE_RAM_GO garde
     # son rôle de seuil absolu de dernier recours
     LIMITE_RAM_GO = round(ram_total_go * 0.96, 1)
-
 
 def lire_vram_systeme():
     """Lit la VRAM utilisée (en Go) via nvidia-smi."""
@@ -289,7 +304,6 @@ def lire_vram_systeme():
             return torch.cuda.memory_allocated() / 1e9
         return 0.0
 
-
 def lire_temp_gpu():
     """Lit la température du GPU (en °C) via nvidia-smi."""
     try:
@@ -300,7 +314,6 @@ def lire_temp_gpu():
         return int(r.stdout.strip())
     except Exception:
         return 0
-
 
 def get_memoire():
     """Retourne un dict avec toutes les infos mémoire et CPU."""
@@ -317,7 +330,6 @@ def get_memoire():
         "ram_pct"      : round(ram.percent, 1),
         "cpu_pct"      : round(psutil.cpu_percent(interval=None), 1),
     }
-
 
 def check_securite():
     """
@@ -346,7 +358,7 @@ def check_securite():
         if crit_temp: raison.append(f"GPU {temp}°C ≥ {s['critique_temp']}°C")
         raison_str = " + ".join(raison)
         print(f"\n🔴 CRITIQUE : {raison_str}")
-        print(f"   Arrêt propre — reprise automatique dès que les conditions s'améliorent")
+        print("   Arrêt propre — reprise automatique dès que les conditions s'améliorent")
         # Écriture dans log_active.json (log_data est global)
         log_data["status"]      = "arret_critique"
         log_data["last_update"] = time.time()
@@ -363,7 +375,7 @@ def check_securite():
     if pause_ram:
         raison = f"RAM {ram_pct:.1f}% ≥ {s['pause_ram']}%"
         print(f"\n⏸️  PAUSE : {raison}")
-        print(f"   En attente de libération mémoire (monitor.py surveille)...")
+        print("   En attente de libération mémoire (monitor.py surveille)...")
         log_data["status"]      = "pause"
         log_data["last_update"] = time.time()
         try:
@@ -413,7 +425,6 @@ def check_securite():
 
     return True
 
-
 # ================================================================
 #  FONCTIONS UTILITAIRES DE SAISIE
 # ================================================================
@@ -438,7 +449,6 @@ def demander(question, defaut, type_=str, mini=None, maxi=None):
     except (ValueError, TypeError):
         print(f"  ⚠️  Valeur invalide → {defaut} conservé")
         return defaut
-
 
 # ================================================================
 #  ASSISTANT DE CONFIGURATION GUIDÉ
@@ -488,7 +498,7 @@ def configurer():
         recomm = "  ← RECOMMANDÉ POUR TON PC" if nom_p == preset_recommande else ""
         print(f"  [{i}] {p['emoji']} {nom_p:<8} {p['nb_params_approx']:<8} "
               f"{p['description']}{recomm}")
-    print(f"  [5] 🔧 CUSTOM   Je configure chaque paramètre moi-même")
+    print("  [6] 🔧 CUSTOM   Je configure chaque paramètre moi-même")
     print()
     print("  Appuie sur Entrée pour utiliser la config recommandée.")
 
@@ -502,7 +512,7 @@ def configurer():
 
     checkpoint_interval = None  # sera défini dans ÉTAPE 3 ou dans le mode Simple custom
 
-    if 1 <= choix_num <= 4:
+    if 1 <= choix_num <= 5:
         # ── Preset sélectionné ───────────────────────────────────
         nom_preset       = noms_presets[choix_num - 1]
         p                = PRESETS[nom_preset]
@@ -520,6 +530,7 @@ def configurer():
 
     else:
         # ── Mode CUSTOM ──────────────────────────────────────────
+        nom_preset = "CUSTOM"
         print("\n  🔧 MODE CUSTOM")
         print()
         print("  Combien de paramètres veux-tu pour ton modèle ?")
@@ -560,7 +571,7 @@ def configurer():
 
         def _calculer_config(cible):
             import math as _math
-            VOCAB = 32000
+            VOCAB = _VOCAB_SIZE
             BLOCK = 256
             best = None
             best_ecart = float("inf")
@@ -615,8 +626,7 @@ def configurer():
 
         if mode_c == "2":
             # ── Expert : valeurs calculées pré-remplies, recommandations dynamiques ──
-            import math as _math2
-            VOCAB_E = 32000; BLOCK_E = 256
+            VOCAB_E = _VOCAB_SIZE; BLOCK_E = 256
 
             def _conseil(msg):
                 print("  \U0001f4a1 " + msg)
@@ -637,7 +647,7 @@ def configurer():
 
             # ── ACCUMULATION ────────────────────────────────────────────────────
             print("\n  ─── ACCUMULATION DE GRADIENTS ────────────────────────────────")
-            print(f"  Simule un plus grand batch sans consommer plus de VRAM.")
+            print("  Simule un plus grand batch sans consommer plus de VRAM.")
             print(f"  Recommandé : {_batch_rec_ga} (pour atteindre batch effectif ~32).")
             grad_accum_steps = demander("Accumulation", ga_c, int, mini=1, maxi=128)
             _eff = batch_size * grad_accum_steps
@@ -674,8 +684,7 @@ def configurer():
 
             # ── N_HEAD ──────────────────────────────────────────────────────────
             diviseurs_valides = [d for d in [1, 2, 4, 8, 12, 16] if n_embd % d == 0]
-            _head_size_rec = n_embd // diviseurs_valides[-1]
-            print(f"\n  ─── TÊTES D'ATTENTION (n_head) ─────────────────────────────────────")
+            print("\n  ─── TÊTES D'ATTENTION (n_head) ─────────────────────────────────────")
             print(f"  Valides pour n_embd={n_embd} : {diviseurs_valides}")
             print(f"  Head size cible ≈ 64 (stable) — recommandé : {diviseurs_valides[-1]} (head size = {n_embd // diviseurs_valides[-1]}).")
             n_head_def = n_head_calc if n_embd % n_head_calc == 0 else diviseurs_valides[-1]
@@ -749,7 +758,6 @@ def configurer():
             print("  Toutes les 1000 étapes → moins fréquent")
             checkpoint_interval = demander("Sauvegarder toutes les N étapes", 500, int, mini=10, maxi=10000)
             print(f"\n  ✅ Config : {n_embd} embd / {n_head} heads / {n_layer} layers — {params_label} — originalité {dropout} — checkpoint /{checkpoint_interval}")
-
 
     # ────────────────────────────────────────────────────────────
     #  ÉTAPE 3 — SAUVEGARDE AUTOMATIQUE (CHECKPOINT)
@@ -827,15 +835,55 @@ def configurer():
         "checkpoint_interval": checkpoint_interval,
         "eval_interval"      : eval_interval,
         "eval_iters"         : eval_iters,
-        "preset"             : nom_preset if 1 <= choix_num <= 4 else "CUSTOM",
+        "preset"             : nom_preset,
     }
 
+# ================================================================
+#  MODE RAPIDE (--quick) : zéro question, preset MINI
+# ================================================================
+
+def configurer_quick():
+    """
+    Configuration automatique pour python go.py --quick (ou quick.py).
+    Aucune interaction : preset MINI, nom 'test_20M', mode auto.
+    """
+    print("\n" + "="*62)
+    print("  ⚡  MODE RAPIDE — WishAI Quick")
+    print("="*62)
+    device, gpu_nom, vram_go, ram_go, _ = verifier_pc()
+    configurer_limites_memoire(vram_go, ram_go)
+    p = PRESETS["MINI"]
+    print(f"\n  Preset sélectionné : {p['emoji']} MINI — {p['nb_params_approx']} paramètres")
+    print(f"  {p['description']}")
+    print("  (nom du modèle : Turc)")
+    print("  (durée : 30 minutes max)")
+    print("="*62)
+    return {
+        "nom_modele"         : "Turc",
+        "device"             : device,
+        "gpu_nom"            : gpu_nom,
+        "vram_total_go"      : vram_go,
+        "ram_total_go"       : ram_go,
+        "batch_size"         : p["batch_size"],
+        "grad_accum_steps"   : p.get("grad_accum_steps", 2),
+        "block_size"         : p["block_size"],
+        "n_embd"             : p["n_embd"],
+        "n_head"             : p["n_head"],
+        "n_layer"            : p["n_layer"],
+        "dropout"            : p["dropout"],
+        "learning_rate"      : p["learning_rate"],
+        "checkpoint_interval": 500,
+        "eval_interval"      : 500,
+        "eval_iters"         : 100,
+        "preset"             : "MINI",
+    }
 
 # ================================================================
 #  LANCEMENT DE LA CONFIGURATION
 # ================================================================
 
-cfg = configurer()
+_QUICK_MODE = "--quick" in sys.argv
+cfg = configurer_quick() if _QUICK_MODE else configurer()
 
 # Extraction des variables
 nom_modele          = cfg["nom_modele"]
@@ -853,7 +901,6 @@ eval_interval       = cfg["eval_interval"]
 eval_iters          = cfg["eval_iters"]
 max_iters           = 999_999_999   # sera ajusté par choisir_duree()
 
-
 # ================================================================
 #  CHARGEMENT DU TOKENIZER BPE
 # ================================================================
@@ -870,8 +917,7 @@ tok          = TokenizerBPE()
 tok.charger(TOKENIZER_FILE)
 taille_vocab = tok.taille_vocab
 print(f"  ✅ Vocab BPE : {taille_vocab} tokens chargés")
-print(f"     (vs ~100 tokens en char-level — contexte 3× plus riche !)")
-
+print("     (vs ~100 tokens en char-level — contexte 3× plus riche !)")
 
 # ================================================================
 #  SÉLECTION ET CHARGEMENT DES DONNÉES
@@ -882,7 +928,6 @@ FLAG      = {
     "en"   : "🇬🇧 Anglais",
     "multi": "🌍 Multilingue",
 }
-
 
 def choisir_donnees():
     """
@@ -919,6 +964,13 @@ def choisir_donnees():
     for i, (langue, chemin, taille) in enumerate(langues_dispo, 1):
         print(f"  [{i}]  {FLAG.get(langue, langue):<24} {taille:.1f} Mo")
     print("="*62)
+    if _QUICK_MODE:
+        # Mode rapide : prend le plus grand dataset automatiquement
+        langues_dispo.sort(key=lambda x: x[2], reverse=True)
+        langue, chemin, taille = langues_dispo[0]
+        DATA_FILE = chemin
+        print(f"  → Mode rapide : {FLAG.get(langue, langue)} sélectionné (le plus grand)")
+        return
     choix = input("  Choix > ").strip()
     try:
         idx = int(choix) - 1
@@ -932,7 +984,6 @@ def choisir_donnees():
     langue, chemin, taille = langues_dispo[0]
     DATA_FILE = chemin
     print(f"  → {FLAG.get(langue, langue)} sélectionné par défaut")
-
 
 print("\n" + "="*62)
 print("  📚  DONNÉES D'ENTRAÎNEMENT")
@@ -980,7 +1031,6 @@ print(f"\n  Train : {len(train_data):,} tokens (90%)")
 print(f"  Val   : {len(val_data):,}   tokens (10%) — jamais vus pendant l'entraînement")
 print(f"  RAM   : {data.element_size() * data.nelement() / 1e9:.2f} Go")
 
-
 def get_batch(split):
     """
     Extrait un mini-batch aléatoire du dataset.
@@ -997,7 +1047,6 @@ def get_batch(split):
     y  = torch.stack([d[i+1:i+block_size+1] for i in ix]).long()
     return x.to(device), y.to(device)
 
-
 # ================================================================
 #  ARCHITECTURE DU MODÈLE GPT
 # ================================================================
@@ -1012,196 +1061,9 @@ def get_batch(split):
 #             → Linear → probabilités sur le vocabulaire
 # ================================================================
 
-class CoucheAttention(nn.Module):
-    """
-    Une tête d'attention causale (masked self-attention).
-
-    L'attention répond à la question :
-    "Pour prédire le prochain token, sur quels tokens précédents
-     dois-je me concentrer ?"
-
-    Formule : Attention(Q,K,V) = softmax(Q·Kᵀ / √d) · V
-
-      Q (Query)  = "ce que je cherche"
-      K (Key)    = "ce que j'ai à proposer"
-      V (Value)  = "l'information que j'envoie si je suis choisi"
-
-    Le masque triangulaire inférieur garantit que le token i
-    ne peut regarder que les tokens 0..i (pas le futur).
-    → permet la génération gauche → droite.
-    """
-    def __init__(self, taille_tete):
-        super().__init__()
-        self.key    = nn.Linear(n_embd, taille_tete, bias=False)
-        self.query  = nn.Linear(n_embd, taille_tete, bias=False)
-        self.value  = nn.Linear(n_embd, taille_tete, bias=False)
-        # Masque causal : 1 si on peut regarder, 0 sinon
-        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, x):
-        B, T, C = x.shape
-        k       = self.key(x)
-        q       = self.query(x)
-        # Division par √d pour stabiliser les gradients
-        scores  = q @ k.transpose(-2, -1) * (k.shape[-1] ** -0.5)
-        # Bloque l'accès aux tokens futurs (remplace par -inf → proba 0 après softmax)
-        scores  = scores.masked_fill(self.tril[:T, :T] == 0, float('-inf'))
-        scores  = F.softmax(scores, dim=-1)
-        scores  = self.dropout(scores)
-        return scores @ self.value(x)
-
-
-class MultiTetesAttention(nn.Module):
-    """
-    Multi-Head Attention : n_head têtes en parallèle.
-
-    Chaque tête peut apprendre à capturer un type de relation
-    différent dans le texte :
-      tête 1 → relations sujet-verbe
-      tête 2 → co-références (il/elle → qui ?)
-      tête 3 → structure syntaxique
-      ...
-
-    Les sorties de toutes les têtes sont concaténées, puis
-    projetées en n_embd dimensions via une couche linéaire.
-    """
-    def __init__(self, n_tetes, taille_tete):
-        super().__init__()
-        self.tetes      = nn.ModuleList([CoucheAttention(taille_tete) for _ in range(n_tetes)])
-        self.projection = nn.Linear(taille_tete * n_tetes, n_embd)
-        self.dropout    = nn.Dropout(dropout)
-
-    def forward(self, x):
-        out = torch.cat([tete(x) for tete in self.tetes], dim=-1)
-        return self.dropout(self.projection(out))
-
-
-class CoucheFFN(nn.Module):
-    """
-    Feed-Forward Network — appliqué à chaque position indépendamment.
-
-    Après l'attention (qui mélange l'info entre tokens),
-    le FFN transforme chaque représentation individuellement.
-    L'expansion 4× (n_embd → 4*n_embd → n_embd) permet au
-    réseau de "réfléchir" dans un espace plus grand.
-
-    C'est ici que la majeure partie du "savoir" est stocké.
-    """
-    def __init__(self):
-        super().__init__()
-        self.reseau = nn.Sequential(
-            nn.Linear(n_embd, 4 * n_embd),   # expansion ×4
-            nn.ReLU(),                         # non-linéarité
-            nn.Linear(4 * n_embd, n_embd),    # retour à n_embd
-            nn.Dropout(dropout),
-        )
-
-    def forward(self, x):
-        return self.reseau(x)
-
-
-class BlocTransformer(nn.Module):
-    """
-    Un bloc Transformer complet.
-
-    Structure (pre-norm, comme GPT-2) :
-      x → LayerNorm₁ → Multi-Head Attention → + x   (résiduel)
-      x → LayerNorm₂ → FFN                 → + x   (résiduel)
-
-    Les connexions résiduelles (+ x) permettent au gradient
-    de "court-circuiter" les couches profondes pendant la
-    rétropropagation → entraînement de réseaux profonds stable.
-
-    Pre-norm (LayerNorm avant chaque sous-couche) plutôt que
-    post-norm → convergence plus rapide et stable.
-    """
-    def __init__(self):
-        super().__init__()
-        taille_tete    = n_embd // n_head
-        self.attention = MultiTetesAttention(n_head, taille_tete)
-        self.ffn       = CoucheFFN()
-        self.norm1     = nn.LayerNorm(n_embd)
-        self.norm2     = nn.LayerNorm(n_embd)
-
-    def forward(self, x):
-        x = x + self.attention(self.norm1(x))  # attention + résiduel
-        x = x + self.ffn(self.norm2(x))         # FFN + résiduel
-        return x
-
-
-class WishAI_BPE(nn.Module):
-    """
-    Le modèle GPT complet avec tokenisation BPE.
-
-    Architecture complète :
-      1. token_embedding    : convertit chaque token (int) en vecteur (n_embd)
-      2. position_embedding : encode la position dans la séquence
-         → les deux sont additionnés : x = tok_emb + pos_emb
-      3. N × BlocTransformer : transforme progressivement la représentation
-      4. norm_finale        : LayerNorm avant la prédiction
-      5. tete_lm            : projette n_embd → taille_vocab (probabilités)
-
-    Paramètres totaux ≈ taille_vocab×n_embd + block_size×n_embd
-                      + N×(4×n_embd² + 4×n_embd²) + n_embd×taille_vocab
-    """
-    def __init__(self):
-        super().__init__()
-        self.token_embedding    = nn.Embedding(taille_vocab, n_embd)
-        self.position_embedding = nn.Embedding(block_size, n_embd)
-        self.blocs              = nn.Sequential(*[BlocTransformer() for _ in range(n_layer)])
-        self.norm_finale        = nn.LayerNorm(n_embd)
-        self.tete_lm            = nn.Linear(n_embd, taille_vocab)
-        self.apply(self._init_poids)
-
-    def _init_poids(self, module):
-        """Initialisation des poids selon les recommandations de GPT-2."""
-        if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
-            if module.bias is not None:
-                torch.nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
-
-    def forward(self, idx, targets=None):
-        B, T    = idx.shape
-        tok_emb = self.token_embedding(idx)
-        pos_emb = self.position_embedding(torch.arange(T, device=device))
-        x       = tok_emb + pos_emb       # fusion token + position
-        x       = self.blocs(x)           # N blocs Transformer
-        x       = self.norm_finale(x)
-        logits  = self.tete_lm(x)         # distribution sur le vocabulaire
-
-        perte = None
-        if targets is not None:
-            B, T, V = logits.shape
-            # Cross-entropy : mesure l'écart entre distribution prédite et vrai token
-            perte = F.cross_entropy(logits.view(B*T, V), targets.view(B*T))
-        return logits, perte
-
-    def generer(self, idx, max_nouveaux_tokens, temperature=1.0):
-        """
-        Génère des tokens un à un (autorégressif).
-
-        temperature :
-          < 1.0 → texte prévisible / cohérent   (ex: 0.5)
-          = 1.0 → distribution telle quelle
-          > 1.0 → texte créatif / plus aléatoire (ex: 1.5)
-
-        Le modèle génère toujours le token le plus probable
-        selon la distribution pondérée par la température,
-        en ne regardant que les block_size derniers tokens.
-        """
-        for _ in range(max_nouveaux_tokens):
-            # Fenêtre glissante : ne garde que les derniers block_size tokens
-            idx_contexte = idx[:, -block_size:]
-            logits, _    = self(idx_contexte)
-            # Distribution du dernier token uniquement
-            logits       = logits[:, -1, :] / temperature
-            probs        = F.softmax(logits, dim=-1)
-            idx_next     = torch.multinomial(probs, num_samples=1)
-            idx          = torch.cat((idx, idx_next), dim=1)
-        return idx
+# Les classes du modèle (CoucheAttention, MultiTetesAttention, CoucheFFN,
+# BlocTransformer, WishAI_BPE) vivent désormais dans src/model.py (importées
+# plus haut). Paramétrées par ConfigModele → testables sans entraînement.
 
 
 # ================================================================
@@ -1211,7 +1073,11 @@ print("\n" + "="*62)
 print("  🧠  CRÉATION DU MODÈLE")
 print("="*62)
 
-modele    = WishAI_BPE().to(device)
+_cfg_modele = ConfigModele(
+    vocab_size=taille_vocab, n_embd=n_embd, n_head=n_head,
+    n_layer=n_layer, block_size=block_size, dropout=dropout,
+)
+modele    = WishAI_BPE(_cfg_modele).to(device)
 nb_params = sum(p.numel() for p in modele.parameters())
 print(f"  Paramètres  : {nb_params:,}  ({nb_params/1e6:.1f}M)")
 print(f"  Vocab       : {taille_vocab} tokens BPE")
@@ -1219,6 +1085,35 @@ print(f"  Contexte    : {block_size} tokens  ≈ {block_size * 3 // 4} mots")
 print(f"  Architecture: {n_layer} couches × {n_head} têtes × {n_embd} dim")
 print(f"  Device      : {device.upper()}")
 
+# ── Précision mixte (AMP) — accélère et réduit la mémoire sur GPU NVIDIA ──
+import contextlib as _contextlib
+_amp_on = (device == "cuda")
+if _amp_on:
+    _amp_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    _amp_ctx   = torch.amp.autocast(device_type="cuda", dtype=_amp_dtype)
+    print(f"  AMP         : activée ({'bfloat16' if _amp_dtype == torch.bfloat16 else 'float16'})")
+else:
+    _amp_dtype = torch.float32
+    _amp_ctx   = _contextlib.nullcontext()
+    print(f"  AMP         : désactivée (float32 sur {device.upper()})")
+# GradScaler : indispensable en fp16 pour éviter les NaN ; inutile en bf16/float32.
+scaler = torch.amp.GradScaler("cuda", enabled=(_amp_on and _amp_dtype == torch.float16))
+
+# ── Compilation (PyTorch 2.x) — activée seulement sur Linux+CUDA ──
+# (instable / non supportée sur Windows et MPS → on saute proprement)
+try:
+    if hasattr(torch, "compile") and device == "cuda" and sys.platform.startswith("linux"):
+        modele = torch.compile(modele)
+        print("  torch.compile : activé")
+    else:
+        print("  torch.compile : ignoré (Linux+CUDA uniquement)")
+except Exception as _e:
+    print(f"  torch.compile : indisponible ({_e}) — on continue sans")
+
+# Module brut sous-jacent : pour sauvegarder/charger les poids SANS le préfixe
+# '_orig_mod.' ajouté par torch.compile → checkpoints toujours compatibles.
+def _modele_brut():
+    return getattr(modele, "_orig_mod", modele)
 
 @torch.no_grad()
 def estimer_perte():
@@ -1241,13 +1136,11 @@ def estimer_perte():
     modele.train()  # réactive le dropout pour l'entraînement
     return out
 
-
 optimiseur = torch.optim.AdamW(modele.parameters(), lr=learning_rate)
 #
 #  AdamW = Adam + weight decay
 #  C'est l'optimiseur standard pour les Transformers.
 #  Il adapte le learning rate de chaque paramètre séparément.
-
 
 # tout va dans model/<nom>/ — propre et rangé
 MODEL_DIR = os.path.join("model", nom_modele)
@@ -1290,7 +1183,11 @@ log_data = {
 }
 
 # ── Reprise depuis checkpoint ────────────────────────────────────
-if os.path.exists(CHECKPOINT_FILE):
+# En mode --quick : on ignore tout checkpoint existant (nouveau départ systématique)
+if _QUICK_MODE and os.path.exists(CHECKPOINT_FILE):
+    os.remove(CHECKPOINT_FILE)
+
+if not _QUICK_MODE and os.path.exists(CHECKPOINT_FILE):
     print("\n" + "="*62)
     print("  💾  CHECKPOINT DÉTECTÉ !")
     print("="*62)
@@ -1302,7 +1199,7 @@ if os.path.exists(CHECKPOINT_FILE):
     print("  [n] Recommencer depuis zéro  (efface le checkpoint)")
     choix = input("  Choix [O] > ").strip().lower()
     if choix != 'n':
-        modele.load_state_dict(_ckpt_tmp["modele_state"])
+        _modele_brut().load_state_dict(_ckpt_tmp["modele_state"])
         optimiseur.load_state_dict(_ckpt_tmp["optimiseur_state"])
         start_iter = ckpt_iter + 1
         log_data   = _ckpt_tmp.get("log_data", log_data)
@@ -1327,19 +1224,18 @@ else:
             nom_base = os.path.basename(os.path.dirname(f))
             taille = os.path.getsize(f) / 1_000_000
             print(f"    [{i+1}] {nom_base}  ({taille:.0f} Mo)")
-        print(f"    [0] Nouveau modèle depuis zéro  ← par défaut")
+        print("    [0] Nouveau modèle depuis zéro  ← par défaut")
         choix_base = input("  Choix [0] > ").strip()
         try:
             idx_base = int(choix_base)
             if 1 <= idx_base <= len(modeles_dispo):
                 base_file = modeles_dispo[idx_base - 1]
                 base_ckpt = torch.load(base_file, map_location=device, weights_only=False)
-                modele.load_state_dict(base_ckpt["modele_state"])
+                _modele_brut().load_state_dict(base_ckpt["modele_state"])
                 print(f"  → Poids chargés depuis {base_file}")
-                print(f"     Fine-tuning activé !")
+                print("     Fine-tuning activé !")
         except Exception:
             print("  → Nouveau modèle depuis zéro")
-
 
 # ================================================================
 #  SÉLECTEUR DE DURÉE D'ENTRAÎNEMENT
@@ -1393,10 +1289,12 @@ def choisir_duree():
     debut_w = time.time()
     for _ in range(100):
         xb, yb    = get_batch('train')
-        _, loss_w = modele(xb, yb)
         optimiseur.zero_grad(set_to_none=True)
-        loss_w.backward()
-        optimiseur.step()
+        with _amp_ctx:
+            _, loss_w = modele(xb, yb)
+        scaler.scale(loss_w).backward()
+        scaler.step(optimiseur)
+        scaler.update()
     vitesse = 100 / max(time.time() - debut_w, 1e-6)
 
     new_start      = start_iter + 100
@@ -1408,7 +1306,7 @@ def choisir_duree():
     print(f"  Étapes planifiées : {new_max:,}  ({iters_restants:,} après warmup)")
     print(f"  Fin prévue à      : {heure_fin}")
 
-    confirm = input(f"\n  Confirmer ? [O/n] > ").strip().lower()
+    confirm = input("\n  Confirmer ? [O/n] > ").strip().lower()
     if confirm != 'n':
         max_iters = new_max
         log_data["hyperparams"]["max_iters"] = max_iters
@@ -1416,8 +1314,34 @@ def choisir_duree():
         print(f"  ✅ Entraînement jusqu'à l'étape {max_iters:,}")
     return new_start
 
-
-new_start_iter = choisir_duree()
+if _QUICK_MODE:
+    # Mode rapide : 30 minutes max, puis arrêt propre
+    _QUICK_MAX_MINUTES = 30
+    _QUICK_MAX_SEC     = _QUICK_MAX_MINUTES * 60
+    print(f"\n  ⚡ Mode rapide — mesure de la vitesse (50 étapes)...")
+    _t0_warmup = time.time()
+    for _wi in range(50):
+        _xw, _yw = get_batch('train')
+        optimiseur.zero_grad(set_to_none=True)
+        with _amp_ctx:
+            _, _lw = modele(_xw, _yw)
+            _lw = _lw / grad_accum_steps
+        scaler.scale(_lw).backward()
+        scaler.step(optimiseur)
+        scaler.update()
+    _vitesse_quick = 50 / max(time.time() - _t0_warmup, 1e-6)
+    _iters_30min   = int(_vitesse_quick * _QUICK_MAX_SEC)
+    max_iters      = start_iter + 50 + _iters_30min
+    log_data["hyperparams"]["max_iters"] = max_iters
+    log_data["mode"] = f"quick {_QUICK_MAX_MINUTES}min"
+    new_start_iter  = start_iter + 50
+    _heure_fin = time.strftime("%H:%M", time.localtime(time.time() + _QUICK_MAX_SEC))
+    print(f"  Vitesse : {_vitesse_quick:.1f} it/s  →  ~{_iters_30min:,} étapes en {_QUICK_MAX_MINUTES} min")
+    print(f"  Fin prévue à {_heure_fin}")
+    _QUICK_DEADLINE = time.time() + _QUICK_MAX_SEC
+else:
+    _QUICK_DEADLINE = None
+    new_start_iter = choisir_duree()
 
 print("\n" + "="*62)
 print("  🚀  ENTRAÎNEMENT EN COURS")
@@ -1432,7 +1356,6 @@ print("  val_loss   = erreur sur données jamais vues (plus importante !)")
 print("  perp       = perplexité = e^(val_loss)  |  GPT-2 small ≈ 30")
 print("  Gap        = val_loss − train_loss  |  idéal ≈ 0  (si > 0.3 → overfitting)")
 print("="*62 + "\n")
-
 
 # ── Initialisation des logs ──────────────────────────────────────
 debut        = time.time()
@@ -1455,7 +1378,6 @@ def _stop_handler(sig, frame):
     _stop_demande = True
     print("\n⚠️  Ctrl+C détecté — arrêt propre en cours...")
 _sig.signal(_sig.SIGINT, _stop_handler)
-
 
 # ================================================================
 #  BOUCLE D'ENTRAÎNEMENT PRINCIPALE
@@ -1548,60 +1470,107 @@ for iteration in range(new_start_iter, max_iters):
                     print("   L'IA a atteint son meilleur niveau sur ces données.")
                     break
 
-    # ── Checkpoint (toutes les checkpoint_interval étapes) ───────
-    if iteration % checkpoint_interval == 0 and iteration > 0:
-        torch.save({
-            "iteration"        : iteration,
-            "modele_state"     : modele.state_dict(),
-            "optimiseur_state" : optimiseur.state_dict(),
-            "log_data"         : log_data,
-        }, CHECKPOINT_FILE)
-
     # ── Etape d'entrainement ──────────────────────────────────────
     optimiseur.zero_grad(set_to_none=True)
     for micro_step in range(grad_accum_steps):
         xb, yb        = get_batch('train')
-        logits, perte = modele(xb, yb)
-        perte = perte / grad_accum_steps
-        perte.backward()
-    optimiseur.step()
+        with _amp_ctx:
+            logits, perte = modele(xb, yb)
+            perte = perte / grad_accum_steps
+        scaler.scale(perte).backward()
+    scaler.step(optimiseur)
+    scaler.update()
 
     # Phase 1 protection : ralentit si RAM en alerte
     if _ralentir:
         time.sleep(_PROT_SEUILS["ralentir_ms"] / 1000)
 
     if _stop_demande:
-        print("\n  Arret propre en cours...")
-        torch.save({
-            "iteration"        : iteration,
-            "modele_state"     : modele.state_dict(),
-            "optimiseur_state" : optimiseur.state_dict(),
-            "log_data"         : log_data,
-        }, CHECKPOINT_FILE)
-        print(f"  Checkpoint sauvegarde -- relance go.py pour continuer")
+        print("\n  Arrêt propre en cours — sauvegarde du modèle...")
         break
 
-# SAUVEGARDE FINALE
-MODELE_FILE = os.path.join(MODEL_DIR, "modele.pt")
+    if _QUICK_DEADLINE and time.time() >= _QUICK_DEADLINE:
+        print(f"\n  ⏱️  30 minutes écoulées — arrêt du mode rapide.")
+        break
+
+# ================================================================
+#  SAUVEGARDE FINALE DU MODÈLE
+#  Deux formats complémentaires :
+#    modele.pt          → poids + architecture complète (PyTorch natif)
+#    modele.safetensors → poids seuls + métadonnées (format universel)
+# ================================================================
+
+print("\n" + "="*62)
+print("  💾  SAUVEGARDE DU MODÈLE")
+print("="*62)
+
+MODELE_FILE      = os.path.join(MODEL_DIR, "modele.pt")
 SAFETENSORS_FILE = os.path.join(MODEL_DIR, "modele.safetensors")
 
-checkpoint_final = {
-    'modele_state': modele.state_dict(),
-    'taille_vocab': taille_vocab,
-    'tokenizer':    'BPE',
-    'hyperparams': {
-        'n_embd': n_embd, 'n_head': n_head, 'n_layer': n_layer,
-        'block_size': block_size, 'dropout': dropout,
-    }
+_date_iso = time.strftime("%Y-%m-%d %H:%M:%S")
+_val_finale = (log_data["steps"][-1]["val_loss"] if log_data.get("steps") else None)
+
+# ── modele.pt — tout ce qu'il faut pour recharger et utiliser le modèle ──
+modele_final = {
+    "modele_state": _modele_brut().state_dict(),
+    "architecture": {
+        "n_embd"    : n_embd,
+        "n_head"    : n_head,
+        "n_layer"   : n_layer,
+        "block_size": block_size,
+        "dropout"   : dropout,
+        "vocab_size": taille_vocab,
+        "nb_params" : nb_params,
+    },
+    "entrainement": {
+        "tokenizer"   : "BPE",
+        "preset"      : cfg.get("preset", "CUSTOM"),
+        "nom_modele"  : nom_modele,
+        "device"      : device,
+        "iterations"  : log_data.get("iteration_courante", 0),
+        "val_loss"    : round(_val_finale, 6) if _val_finale else None,
+        "date"        : _date_iso,
+    },
 }
-torch.save(checkpoint_final, MODELE_FILE)
-print(f"  💾 Modèle PyTorch sauvegardé → {MODELE_FILE}")
+torch.save(modele_final, MODELE_FILE)
+print(f"  OK modele.pt          -> {MODELE_FILE}")
 
+# modele.safetensors -- format universel avec metadonnees
 try:
-    # Sauvegarde des poids en safetensors pour l'export / production
-    safe_save_file(modele.state_dict(), SAFETENSORS_FILE)
-    print(f"  📦 Modèle Safetensors sauvegardé → {SAFETENSORS_FILE}")
+    _meta = {
+        "format"     : "wishai-bpe",
+        "nom_modele" : nom_modele,
+        "preset"     : cfg.get("preset", "CUSTOM"),
+        "n_embd"     : str(n_embd),
+        "n_head"     : str(n_head),
+        "n_layer"    : str(n_layer),
+        "block_size" : str(block_size),
+        "dropout"    : str(dropout),
+        "vocab_size" : str(taille_vocab),
+        "nb_params"  : str(nb_params),
+        "tokenizer"  : "BPE",
+        "val_loss"   : str(round(_val_finale, 6)) if _val_finale else "n/a",
+        "date"       : _date_iso,
+        "device"     : device,
+    }
+    safe_save_file(_modele_brut().state_dict(), SAFETENSORS_FILE, metadata=_meta)
+    print(f"  OK modele.safetensors -> {SAFETENSORS_FILE}")
 except Exception as e:
-    print(f"  ⚠️ Impossible de sauvegarder en .safetensors : {e}")
+    print(f"  ATTENTION : Impossible de sauvegarder en .safetensors : {e}")
 
-shu
+# Nettoyage : supprime checkpoint.pt residuel s il existe
+if os.path.exists(CHECKPOINT_FILE):
+    try:
+        os.remove(CHECKPOINT_FILE)
+        print("  checkpoint.pt supprime (remplace par le modele final)")
+    except Exception:
+        pass
+
+_taille_pt = os.path.getsize(MODELE_FILE) / 1e6 if os.path.exists(MODELE_FILE) else 0
+_taille_st = os.path.getsize(SAFETENSORS_FILE) / 1e6 if os.path.exists(SAFETENSORS_FILE) else 0
+print()
+print(f"  Modele : {nb_params/1e6:.1f}M params  |  "
+      f".pt {_taille_pt:.1f} Mo  |  .safetensors {_taille_st:.1f} Mo")
+if _val_finale:
+    print(f"  Val Loss finale : {_val_finale:.4f}")
+print("="*62)

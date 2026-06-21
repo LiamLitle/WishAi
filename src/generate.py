@@ -11,9 +11,6 @@ from torch.nn import functional as F
 import os, sys, glob
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Centralisation du cache (__pycache__)
-os.environ["PYTHONPYCACHEPREFIX"] = os.path.join(ROOT, "cache", "pycache")
-sys.pycache_prefix = os.path.join(ROOT, "cache", "pycache")
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 

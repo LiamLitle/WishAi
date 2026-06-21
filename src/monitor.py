@@ -7,8 +7,12 @@
 =================================================================
 """
 
-import json, time, os, sys, threading, subprocess
+import json, time, os, sys, threading, subprocess, socket
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
+
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
 
 try:
     import psutil
@@ -68,9 +72,12 @@ def _lire_control():
 def _ecrire_control(commande, **extra):
     data = {"commande": commande, "timestamp": time.time()}
     data.update(extra)
+    # Ecriture atomique (.tmp + os.replace) pour eviter un fichier corrompu.
     try:
-        with open(CONTROL_FILE, "w", encoding="utf-8") as f:
+        tmp = CONTROL_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False)
+        os.replace(tmp, CONTROL_FILE)
     except Exception:
         pass
 
@@ -196,31 +203,69 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args): pass
 
     def do_GET(self):
-        with etat_lock:
-            payload = json.dumps(etat, ensure_ascii=False).encode()
+        if self.path == "/events":
+            self._sse()
+        else:
+            with etat_lock:
+                payload = json.dumps(etat, ensure_ascii=False).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(payload)
 
+    def _sse(self):
+        """Server-Sent Events — pousse l'etat systeme en temps reel."""
         self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        self.wfile.write(payload)
+        try:
+            while True:
+                with etat_lock:
+                    payload = json.dumps(etat, ensure_ascii=False)
+                self.wfile.write(("data: " + payload + "\n\n").encode())
+                self.wfile.flush()
+                time.sleep(1)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
 
 
-# ── Lancement des threads ─────────────────────────────────────────
+# -- Lancement des threads -------------------------------------------------
 threading.Thread(target=lire_memoire, daemon=True).start()
 threading.Thread(target=watchdog,     daemon=True).start()
 
-print("="*54)
-print("  MONITEUR DÉMARRÉ")
-print(f"  GPU  : {GPU_NOM}")
-print(f"  VRAM : {GPU_TOTAL:.1f} Go  |  Limite : {LIMITE_VRAM} Go")
-print(f"  RAM  : {psutil.virtual_memory().total/1e9:.1f} Go")
-print(f"  🛡️  Protection : {_PROT_NIVEAU.upper()}")
-print(f"  Serveur : http://localhost:8001/")
-print("="*54 + "\n")
+
+def _port_libre():
+    """Trouve un port TCP disponible."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("", 0))
+        return s.getsockname()[1]
+
+port = _port_libre()
+
+# Ecrit le port dans monitor_port.json pour que dashboard.py puisse le lire
+_port_file = os.path.join(_ROOT_DIR, "monitor_port.json")
+try:
+    with open(_port_file, "w", encoding="utf-8") as _f:
+        json.dump({"port": port}, _f)
+except Exception:
+    pass
+
+print("=" * 54)
+print("  MONITEUR DEMARRE")
+print("  GPU  : " + GPU_NOM)
+print("  VRAM : " + str(round(GPU_TOTAL, 1)) + " Go  |  Limite : " + str(LIMITE_VRAM) + " Go")
+print("  RAM  : " + str(round(psutil.virtual_memory().total / 1e9, 1)) + " Go")
+print("  Protection : " + _PROT_NIVEAU.upper())
+print("  Serveur    : http://localhost:" + str(port) + "/")
+print("  SSE        : http://localhost:" + str(port) + "/events")
+print("=" * 54 + "\n")
 
 try:
-    HTTPServer(("localhost", 8001), Handler).serve_forever()
+    ThreadingHTTPServer(("localhost", port), Handler).serve_forever()
 except KeyboardInterrupt:
-    print("\n\nMoniteur arrêté.")
+    print("\n\nMoniteur arrete.")

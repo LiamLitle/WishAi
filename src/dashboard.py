@@ -2,21 +2,23 @@
 # Sert dashboard.html, library.html ET expose une API pour les telechargements
 # python src/dashboard.py   (ou simplement : python go.py)
 
-import os, sys, socket, threading, time, webbrowser, json, subprocess
+import os, sys, socket, threading, time, webbrowser, json, subprocess, glob, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC  = os.path.dirname(os.path.abspath(__file__))
-os.environ["PYTHONPYCACHEPREFIX"] = os.path.join(ROOT, "cache", "pycache")
 
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from socketserver import ThreadingMixIn
+from urllib.parse import urlparse
+
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
 
 # --- Garde en memoire les telechargements en cours ---
 _downloads_en_cours = {}
 
 # --- Etat du catalogue automatique ---
 _catalogue_status = {"state": "idle", "count": 0, "ts": 0}
-
 
 class WishAIHandler(SimpleHTTPRequestHandler):
 
@@ -36,6 +38,10 @@ class WishAIHandler(SimpleHTTPRequestHandler):
             self._json(_catalogue_status)
         elif path == "/api/pwc":
             self._handle_pwc(parsed.query)
+        elif path == "/api/events":
+            self._handle_sse()
+        elif path == "/api/models":
+            self._handle_models()
         else:
             super().do_GET()
 
@@ -165,6 +171,115 @@ class WishAIHandler(SimpleHTTPRequestHandler):
         threading.Thread(target=run_cat, daemon=True).start()
         self._json({"status": "started"})
 
+    # -- SSE : flux temps reel (logs + session + monitor) --------------------
+    def _handle_sse(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        last_log_steps   = -1
+        last_session_id  = None
+        last_mon_ts      = 0
+        monitor_url      = None
+        tick = 0
+
+        def _get_monitor_url():
+            port_file = os.path.join(ROOT, "monitor_port.json")
+            try:
+                with open(port_file, encoding="utf-8") as f:
+                    p = json.load(f).get("port")
+                if p:
+                    return f"http://localhost:{p}/"
+            except Exception:
+                pass
+            return None
+
+        def _send(obj):
+            payload = json.dumps(obj, ensure_ascii=False)
+            self.wfile.write(f"data: {payload}\n\n".encode())
+            self.wfile.flush()
+
+        try:
+            while True:
+                # -- logs d'entrainement --
+                try:
+                    active_file = os.path.join(ROOT, "model", "active.json")
+                    if os.path.exists(active_file):
+                        with open(active_file, encoding="utf-8") as f:
+                            active = json.load(f)
+                        nom = active.get("model")
+                        if nom:
+                            log_file = os.path.join(ROOT, "model", nom, "log_active.json")
+                            if os.path.exists(log_file):
+                                with open(log_file, encoding="utf-8") as f:
+                                    log = json.load(f)
+                                steps = len(log.get("steps", []))
+                                if steps != last_log_steps:
+                                    last_log_steps = steps
+                                    _send({"type": "log", "data": log})
+                except Exception:
+                    pass
+
+                # -- session --
+                try:
+                    session_file = os.path.join(ROOT, "session.json")
+                    if os.path.exists(session_file):
+                        with open(session_file, encoding="utf-8") as f:
+                            session = json.load(f)
+                        sid = str(session.get("id", ""))
+                        if sid != last_session_id:
+                            last_session_id = sid
+                            _send({"type": "session", "data": session})
+                except Exception:
+                    pass
+
+                # -- monitor (toutes les 2s) --
+                if tick % 2 == 0:
+                    if monitor_url is None:
+                        monitor_url = _get_monitor_url()
+                    if monitor_url:
+                        try:
+                            req = urllib.request.Request(monitor_url, headers={"User-Agent": "wishai-dash/2"})
+                            with urllib.request.urlopen(req, timeout=1) as r:
+                                mon = json.loads(r.read())
+                            _send({"type": "monitor", "data": mon})
+                        except Exception:
+                            monitor_url = None
+
+                # heartbeat toutes les 15s
+                if tick % 15 == 0:
+                    self.wfile.write(b": heartbeat\n\n")
+                    self.wfile.flush()
+
+                tick += 1
+                time.sleep(1)
+
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+
+    # -- API : liste tous les modeles avec leurs courbes ---------------------
+    def _handle_models(self):
+        modeles = {}
+        pattern = os.path.join(ROOT, "model", "*", "log_active.json")
+        for log_file in sorted(glob.glob(pattern)):
+            nom = os.path.basename(os.path.dirname(log_file))
+            try:
+                with open(log_file, encoding="utf-8") as f:
+                    data = json.load(f)
+                modeles[nom] = {
+                    "nom":    nom,
+                    "steps":  [s.get("iter", i) for i, s in enumerate(data.get("steps", []))],
+                    "train":  [s.get("train_loss") for s in data.get("steps", [])],
+                    "val":    [s.get("val_loss")   for s in data.get("steps", [])],
+                    "params": data.get("hyperparams", {}).get("nb_params"),
+                }
+            except Exception:
+                pass
+        self._json(modeles)
+
     # -- Helpers reponse -----------------------------------------------------
     def _json(self, data, code=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -184,12 +299,11 @@ def _port_libre():
         s.bind(("", 0))
         return s.getsockname()[1]
 
-
 def main():
     os.chdir(ROOT)
 
     port = _port_libre()
-    srv = HTTPServer(("localhost", port), WishAIHandler)
+    srv  = ThreadingHTTPServer(("localhost", port), WishAIHandler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
 
     url     = "http://localhost:" + str(port) + "/dashboard.html"
@@ -198,7 +312,12 @@ def main():
     print("  bibliotheque -> " + lib_url)
     print("  Ctrl+C pour quitter\n")
 
-    webbrowser.open(url)
+    with open(os.path.join(ROOT, "dashboard_url.json"), "w", encoding="utf-8") as _f:
+        json.dump({"port": port, "url": url, "lib_url": lib_url}, _f)
+
+    open_page = os.environ.get("_WISHAI_OPEN_PAGE", "dashboard.html")
+    open_url  = "http://localhost:" + str(port) + "/" + open_page
+    webbrowser.open(open_url)
 
     try:
         while True:
@@ -207,7 +326,6 @@ def main():
         pass
 
     srv.shutdown()
-
 
 if __name__ == "__main__":
     main()

@@ -11,7 +11,7 @@
 <!-- Stack & Compatibilité -->
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
-[![GPU](https://img.shields.io/badge/GPU-CUDA%20%7C%20CPU-76b900?logo=nvidia&logoColor=white)](https://pytorch.org/get-started/locally/)
+[![GPU](https://img.shields.io/badge/GPU-CUDA%20%7C%20MPS%20%7C%20CPU-76b900?logo=nvidia&logoColor=white)](https://pytorch.org/get-started/locally/)
 ![Cross-Platform](https://img.shields.io/badge/OS-Windows%20%7C%20Linux%20%7C%20macOS-0078D4)
 
 <br>
@@ -25,6 +25,7 @@
 <br>
 
 <!-- Licence -->
+[![Version](https://img.shields.io/badge/Version-1.1-success)](#)
 [![License](https://img.shields.io/badge/Licence-Non--Commercial-red)](LICENSE)
 
 <br>
@@ -32,6 +33,8 @@
 **nanoGPT c'est bien. Mais t'as pas de dashboard, pas de protection VRAM, et ton PC peut mourir en 4 minutes.**
 
 **WishAI règle ça.**
+
+**🎉 Version 1.1 — architecture moderne + dashboard temps réel.**
 
 *Construit par Liam — from scratch.*
 
@@ -100,6 +103,34 @@ que char-level
 
 ---
 
+## Nouveautés de la v1.1
+
+- **🧠 Architecture moderne (RoPE + RMSNorm + SwiGLU)** — `model.py` passe d'une architecture GPT-2 (2019) à un style LLaMA/Mistral (2024). Même ~20.8M paramètres, meilleure qualité.
+  - `LayerNorm` → `RMSNorm` (plus simple, sans biais, légèrement plus rapide)
+  - Positional embeddings appris → **RoPE** (Rotary Position Embedding) : meilleure généralisation sur les longues séquences
+  - FFN `Linear → ReLU → Linear` → **SwiGLU** (`SiLU(gate) × up → down`) : meilleure loss à budget de paramètres égal
+- **🔌 Port monitor dynamique** — `monitor.py` ne hardcode plus le port 8001. Il trouve un port libre et l'écrit dans `monitor_port.json`. Plus de crash silencieux si le port est déjà pris.
+- **⚠️ Avertissement virtualenv dans `require.py`** — si Python tourne hors venv (et hors conda), un message clair s'affiche avec demande de confirmation avant toute installation globale.
+- **📡 Dashboard SSE** — le polling `setInterval` est remplacé par **Server-Sent Events**. `dashboard.py` expose `/api/events` qui pousse les logs, les changements de session et les métriques système en temps réel. Fallback polling automatique en cas d'échec SSE.
+- **📊 Comparaison multi-modèles** — nouveau bouton "Comparer les modèles" dans le dashboard : toutes les courbes de loss superposées sur un seul graphe (endpoint `/api/models`).
+- **🧹 Filtrage qualité Common Crawl** — `nettoyer_texte()` dans `telecharger.py` supprime le HTML résiduel, filtre les lignes courtes/spam/truffées d'URL, déduplique le contenu répété, supprime les caractères non-latins.
+- **🐛 Fix : `data/data.txt` vide cassait le tokenizer** — `donnees_existent()` et `trouver_data_file()` vérifient maintenant que le fichier fait plus de 1 Ko, ce qui évite un entraînement BPE silencieux sur du texte vide (produisant un vocab à 1 token : `</w>`).
+- **📝 `CONTRIBUTING.md`** — structure du projet, workflow venv, standards de code, fichiers sensibles, guide PR.
+
+---
+
+## Nouveautés de la v1.0
+
+- **🍎 Support Apple Silicon (MPS)** — entraînement sur Mac M1/M2/M3, plus seulement NVIDIA/CPU.
+- **⚡ Précision mixte (AMP)** — bf16/fp16 automatique sur CUDA : entraînement plus rapide, moins de VRAM (avec un GradScaler en fp16 pour rester stable). `torch.compile` activé sur Linux+CUDA.
+- **🔁 Tokenizer auto-réentraîné** — détecte quand le dataset change (via une signature stockée dans `tokenizer.json`) et se réentraîne tout seul. Fini la suppression manuelle de `tokenizer.json`.
+- **🧪 Smoke tests** — une suite `tests/` (`python -m unittest discover -s tests`) qui couvre le tokenizer, le modèle (forward / save-load / génération) et un test de compilation sur chaque fichier.
+- **🧩 Modèle importable** — le modèle vit maintenant dans `src/model.py`, paramétré et testable sans lancer l'entraînement.
+- **💾 Écritures atomiques de `control.json`** — fichier temporaire + renommage, pour que l'état inter-processus ne se corrompe jamais en plein write.
+- **🩹 Fix du démarrage dashboard** — plus de clignotement entre le dashboard et l'écran d'attente pendant le démarrage de l'entraînement.
+
+---
+
 ## Installation
 
 > Prérequis : **Python 3.8+**, **pip**, **git**
@@ -112,7 +143,7 @@ python go.py
 
 `go.py` installe les dépendances, vérifie le tokenizer, ouvre le dashboard, lance le moniteur en arrière-plan et démarre l'entraînement — tout en une commande.
 
-**GPU (optionnel mais recommandé) :** Si tu as une carte NVIDIA, installe PyTorch avec le support CUDA depuis [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/) — choisis ta version CUDA dans le sélecteur. Sans GPU, WishAI tourne quand même sur CPU (preset NANO recommandé).
+**GPU (optionnel mais recommandé) :** Si tu as une carte NVIDIA, installe PyTorch avec le support CUDA depuis [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/) — choisis ta version CUDA dans le sélecteur. Sur **Apple Silicon (M1/M2/M3)**, WishAI utilise automatiquement le backend **MPS**. Sans GPU, il tourne quand même sur CPU (preset NANO recommandé).
 
 ---
 
@@ -141,13 +172,17 @@ Tu peux aussi **ajouter tes propres textes** : mets n'importe quel fichier `.txt
 
 ---
 
-### 2. Entraîne le tokenizer *(une seule fois)*
+### 2. Le tokenizer *(automatique)*
+
+`go.py` entraîne le tokenizer BPE pour toi au premier lancement, et **le réentraîne automatiquement dès que ton dataset change** — il stocke une signature des données dans `tokenizer.json` et la compare à chaque lancement. Plus besoin de supprimer `tokenizer.json` à la main.
+
+Tu peux quand même le lancer manuellement :
 
 ```bash
 python src/tokenizer.py
 ```
 
-~5–10 minutes. Une barre de progression s'affiche pendant l'encodage :
+~5–10 minutes la première fois. Une barre de progression s'affiche pendant l'encodage :
 
 ```
 [████████████░░░░░░░] 62.5%  (9.3/15.0M mots)
@@ -184,7 +219,7 @@ Minutes [auto] >
 - **Entrée** → s'arrête tout seul à convergence
 - **Un nombre** → calcule les étapes, affiche l'heure de fin
 
-Pendant l'entraînement, un **bouton flottant** apparaît sur ton bureau. Il affiche le modèle en cours et l'étape actuelle, et t'ouvre le dashboard en un clic. Il disparaît automatiquement quand l'entraînement est terminé.
+Pendant l'entraînement, suis la progression en direct dans le **dashboard** (il s'ouvre tout seul) — modèle en cours, étape, courbes de loss et métriques système, le tout en temps réel.
 
 ---
 
@@ -203,16 +238,30 @@ t=0.5 → prévisible    t=1.5 → créatif    n=200 → longueur    q → quitt
 
 ---
 
+### 5. Lance les tests *(optionnel)*
+
+Un petit filet de sécurité pour vérifier que rien n'est cassé après une modif du code :
+
+```bash
+python -m unittest discover -s tests
+```
+
+`OK` = tout va bien. Couvre le round-trip du tokenizer, la détection de changement de dataset, le modèle (forward / save-load / génération) et un test de compilation sur chaque fichier Python.
+
+---
+
 ## Le Dashboard
 
-Le dashboard s'ouvre automatiquement au lancement de `go.py`. Tu peux aussi y accéder via le bouton flottant pendant l'entraînement.
+Le dashboard s'ouvre automatiquement au lancement de `go.py`.
 
-Il affiche en temps réel (via `monitor.py` sur le port 8001) :
+Il affiche en temps réel via **Server-Sent Events** (pas de polling) :
 
 - RAM utilisée / totale, VRAM GPU, température, CPU
 - Courbes de `train_loss` et `val_loss`
 - Étape actuelle, vitesse d'entraînement
 - Niveau de protection actif
+
+Le bouton **📊 Comparer les modèles** superpose les courbes de loss de tous les modèles entraînés sur un seul graphe.
 
 Le bouton **📚 Ouvrir la Bibliothèque** du dashboard ouvre `library.html` — la bibliothèque complète de datasets avec téléchargements en arrière-plan.
 
@@ -307,22 +356,22 @@ Pour changer de niveau : supprime `config.json` et relance `go.py`.
 ```
 [Tokens d'entrée]
        ↓
- Token Embedding + Position Embedding
+ Token Embedding  (+ RoPE appliqué dans l'attention)
        ↓
-┌──────────────────────────────────┐
-│  × N couches (4 à 16 selon preset) │
-│                                  │
-│  LayerNorm → Multi-Head Attention │  ← chaque token regarde les autres
-│           + connexion résiduelle  │
-│                                  │
-│  LayerNorm → Feed-Forward (×4)   │  ← raisonnement local
-│           + connexion résiduelle  │
-└──────────────────────────────────┘
+┌──────────────────────────────────────┐
+│  × N couches (4 à 16 selon preset)   │
+│                                      │
+│  RMSNorm → Multi-Head Attention      │  ← RoPE fait tourner Q et K par position
+│          + connexion résiduelle      │
+│                                      │
+│  RMSNorm → SwiGLU Feed-Forward (8/3×)│  ← SiLU(gate) × up → down
+│          + connexion résiduelle      │
+└──────────────────────────────────────┘
        ↓
-  LayerNorm → Linear → Softmax → Token prédit
+  RMSNorm → Linear → Softmax → Token prédit
 ```
 
-Même architecture que GPT-2, en plus petit. Tout est commenté ligne par ligne dans le code.
+Architecture style LLaMA/Mistral (RoPE + RMSNorm + SwiGLU). Tout est commenté ligne par ligne dans le code.
 
 </details>
 
@@ -341,6 +390,7 @@ wishai/
 ├── control.json        ← communication entre go.py / nanogpt_bpe / monitor
 ├── DATASETS.md         ← liste complète des datasets disponibles
 ├── PARAMETRES.md       ← guide expert des paramètres d'entraînement
+├── CONTRIBUTING.md     ← comment contribuer (venv, standards, guide PR)
 ├── src/                ← tous les scripts Python
 │   ├── nanogpt_bpe.py  ← modèle + entraînement (cœur du projet)
 │   ├── tokenizer.py    ← tokenizer BPE from scratch (avec barre de progression)
@@ -348,13 +398,16 @@ wishai/
 │   ├── telecharger.py  ← téléchargement de données (CLI + interface web)
 │   ├── require.py      ← installation automatique des dépendances
 │   ├── protection.py   ← seuils des 4 niveaux de protection
-│   ├── dashboard.py    ← serveur HTTP local (dashboard + bibliothèque + API)
-│   ├── monitor.py      ← serveur métriques HTTP (port 8001) + watchdog
-│   └── btn_dashboard.py← bouton flottant — apparaît pendant l'entraînement
+│   ├── dashboard.py    ← serveur HTTP local (dashboard + bibliothèque + API + SSE)
+│   ├── monitor.py      ← serveur métriques HTTP (port dynamique) + watchdog
+│   └── model.py        ← modèle Transformer (RoPE+RMSNorm+SwiGLU, importable)
+├── tests/              ← smoke tests
+│   └── test_smoke.py   ← python -m unittest discover -s tests
 ├── assets/             ← screenshots / GIFs pour le README
 ├── cache/              ← cache Python (__pycache__) — local au projet
 ├── data/               ← tes données d'entraînement (texte brut/nettoyé)
 ├── tokenizer.json      ← tokenizer entraîné (généré par src/tokenizer.py)
+├── monitor_port.json   ← port dynamique écrit par monitor.py au démarrage
 └── model/
     └── <nom>/          ← un dossier par modèle (créé automatiquement)
         ├── modele.pt       ← modèle final pour generate.py
@@ -385,13 +438,12 @@ wishai/
 <summary><b>⚙️ Architecture interne — comment les composants communiquent</b></summary>
 <br>
 
-Quand tu lances `python go.py`, quatre processus démarrent :
+Quand tu lances `python go.py`, trois processus démarrent :
 
 ```
 go.py (chef d'orchestre)
   ├── monitor.py        → port 8001  (métriques système en temps réel)
   ├── dashboard.py      → port auto  (sert dashboard.html + library.html + API REST)
-  ├── btn_dashboard.py  → tkinter    (bouton flottant, surveille log_active.json)
   └── nanogpt_bpe.py   → terminal   (l'entraînement lui-même)
 ```
 
@@ -404,6 +456,8 @@ go.py (chef d'orchestre)
 | `/dashboard.html` | GET | Interface de monitoring |
 | `/library.html` | GET | Bibliothèque de datasets |
 | `/api/ping` | GET | Vérifie que le serveur est en ligne |
+| `/api/events` | GET | Flux SSE — logs d'entraînement + session + métriques système |
+| `/api/models` | GET | Historiques de tous les modèles pour la comparaison |
 | `/api/downloads` | GET | Statut de tous les téléchargements en cours |
 | `/api/download` | POST | Lance un téléchargement en arrière-plan |
 
@@ -440,8 +494,8 @@ Oui. N'importe quel fichier `.txt` UTF-8 dans `data/en/` ou `data/fr/`. Une phra
 **Je veux changer le niveau de protection.**
 Supprime `config.json` à la racine du projet et relance `go.py`. Le menu s'affiche à nouveau.
 
-**Le bouton flottant n'apparaît pas.**
-Il ne s'affiche que quand un entraînement est détecté (lit `model/*/log_active.json`). S'il n'apparaît pas du tout, vérifie que `tkinter` est disponible : `python -c "import tkinter"`.
+**Dois-je réentraîner le tokenizer quand je change mes données ?**
+Non. WishAI détecte le changement automatiquement (via une signature dans `tokenizer.json`) et le réentraîne au prochain lancement de `go.py`.
 
 **Je veux télécharger un dataset HuggingFace que je ne trouve pas dans la liste.**
 Ouvre la bibliothèque (bouton dans le dashboard ou `python src/telecharger.py`), onglet **Recherche HuggingFace**, tape un mot-clé. Tu as accès aux 150 000+ datasets du Hub en direct.

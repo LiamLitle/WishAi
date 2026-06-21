@@ -1,0 +1,8 @@
+{
+  "venvPath": ".",
+  "venv": ".venv312",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingModuleSource": "none"
+}

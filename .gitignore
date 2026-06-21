@@ -1,5 +1,5 @@
 # ================================================================
-#  Mini-GPT — .gitignore
+#  WishAI — .gitignore
 #  Fichiers à NE PAS publier sur GitHub
 # ================================================================
 
@@ -32,6 +32,11 @@ __pycache__/
 *.pyd
 .Python
 
+# ── Linters / outils ────────────────────────────────────────────
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
 # ── Environnements virtuels ──────────────────────────────────────
 .venv/
 .venv312/
@@ -51,14 +56,12 @@ Thumbs.db
 control.json
 config.json
 session.json
+dashboard_url.json
+chat_url.json
+monitor_port.json
+deps.lock
 
-# ── Cache Python (généré automatiquement) ───────────────────────
-cache/
-
-# ── Fichiers de test / debug ─────────────────────────────────────
-test_*.py
-*_test.py
-tests/
+# ── Debug / temp ─────────────────────────────────────────────────
 debug/
 tmp/
 *.tmp

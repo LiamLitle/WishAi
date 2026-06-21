@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WishAI — Chat</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- PANEL CONVERSATIONS -->
+<div class="conv-overlay" id="conv-overlay" onclick="closeConvPanel()"></div>
+<aside class="conv-panel" id="conv-panel">
+  <div class="conv-panel-head">
+    <span class="conv-panel-title">Historique</span>
+    <button class="icon-btn" onclick="newConv()" title="Nouvelle conversation">+</button>
+  </div>
+  <div class="conv-list" id="conv-list"></div>
+</aside>
+
+<!-- PANEL MODELE -->
+<div class="model-overlay" id="model-overlay" onclick="closeModelPanel()"></div>
+<div class="model-panel" id="model-panel">
+  <select id="model-select" class="model-select"></select>
+  <button class="model-load-btn" id="load-btn" onclick="loadModel()">Charger</button>
+  <div class="model-status" id="model-status"></div>
+</div>
+
+<!-- APP -->
+<div class="app">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <button class="topbar-btn" onclick="toggleConvPanel()" title="Historique">&#9776;</button>
+    <span class="topbar-logo">WishAI</span>
+    <div class="topbar-right">
+      <span class="model-chip" id="model-chip" onclick="toggleModelPanel()">
+        <span id="chip-label">Aucun modele</span>
+        <span class="chip-dot" id="chip-dot"></span>
+      </span>
+    </div>
+  </header>
+
+  <!-- MESSAGES -->
+  <div class="messages" id="messages">
+    <div class="welcome" id="welcome">
+      <div class="welcome-icon">&#129504;</div>
+      <p class="welcome-title">WishAI Chat</p>
+      <p class="welcome-hint">Charge un modele, puis tape un debut de texte.</p>
+    </div>
+  </div>
+
+  <!-- INPUT -->
+  <div class="input-zone">
+    <div class="input-box" id="input-box">
+      <textarea id="input" class="input-ta"
+                placeholder="Tape un debut de texte..."
+                rows="1"
+                onkeydown="onKey(event)"
+                oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="send-btn" onclick="send()" disabled>&#8593;</button>
+    </div>
+    <div class="settings-row">
+      <label class="setting-lbl">
+        <span>Temp</span>
+        <input type="range" class="mini-slider" id="temp-s" min="0.1" max="2" step="0.1" value="0.8"
+               oninput="document.getElementById('tv').textContent=parseFloat(this.value).toFixed(1)">
+        <span id="tv">0.8</span>
+      </label>
+      <label class="setting-lbl">
+        <span>Long.</span>
+        <input type="range" class="mini-slider" id="len-s" min="20" max="500" step="10" value="200"
+               oninput="document.getElementById('lv').textContent=this.value">
+        <span id="lv">200</span>
+      </label>
+    </div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
