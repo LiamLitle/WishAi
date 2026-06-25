@@ -10,7 +10,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/). Heu
 
 Mise à jour majeure améliorant la fiabilité de l'entraînement, les logs, et la structure interne.
 
-### Nouvelles Fonctionnalités & Entraînement
+### ✨ Ajouté
 
 - **Système de reprise d'entraînement (Recovery)** : L'IA sauvegarde maintenant son état avec robustesse, permettant de reprendre un entraînement exactement là où il s'est arrêté (utile en cas de crash, d'interruption volontaire ou d'erreur humaine).
 - **Logs avancés et système temporaire** : Création d'un sous-dossier `TEMP/` dédié avec horodatage précis (date exacte, heures, secondes) pour un historique granulaire des entraînements sans polluer le dossier principal.
@@ -18,387 +18,236 @@ Mise à jour majeure améliorant la fiabilité de l'entraînement, les logs, et 
   - Le statut d'activation d'AMP (Automatic Mixed Precision) et de `torch.compile()`.
   - Le nombre réel de paramètres du modèle.
   - Le statut d'encodage BPE et Tokenisation, incluant le pourcentage de téléchargement des données et les dossiers/fichiers spécifiques utilisés.
+
+### ♻️ Modifié
+
 - **Détection dynamique** : Amélioration de la détection du modèle en cours pour le dashboard (ne dépend plus aveuglément de `active.json`).
-
-### Interface & Visualisation
-
 - **Expérience Utilisateur (UX) du nuage de mots** : Le nuage de 4 000 tokens a été aplati de force en 2D strict (axe Z fixé à 0) et la rotation 3D a été désactivée, rendant l'interface beaucoup plus lisible.
-
-### Refonte de la Configuration & Bugfixes
-
 - **Architecture de configuration modulaire** : `scripts/config.py` a été refactorisé. Au lieu d'avoir tout dans un seul fichier géant, le code est désormais proprement séparé dans un dossier `scripts/Config/` (`donnees.py`, `modeles.py`, `systeme.py`, `utilitaires.py`).
-- **Correction du bug de "Shadowing" (`token.py`)** : Le script `scripts/token.py` créait un conflit avec les paquets Python standards, ce qui réinitialisait inopinément le tokenizer lors de l'exportation. Il a été renommé en `scripts/reset_token.py`.
 - **Optimisation de l'exportation ONNX/GGUF** : L'export des modèles se fait désormais de manière plus propre, directement dans le répertoire de chaque modèle (`model/<nom_du_modele>/`) avec l'ajout automatique du fichier `tokenizer.json`, au lieu de tout copier de force sur le Bureau.
-- **Correction du chargement pour l'exportation** : `export.py` a été modifié pour gérer le chargement correct des modèles à partir des checkpoints d'entraînement (dictionnaires de poids + `log_active.json` pour la configuration) au lieu de supposer que l'objet PyTorch complet était sauvegardé, évitant ainsi le crash `AttributeError: 'dict' object has no attribute 'eval'`.
+
+### 🐛 Corrigé
+
+- **Bug de "Shadowing" (`token.py`)** : Le script `scripts/token.py` créait un conflit avec les paquets Python standards, ce qui réinitialisait inopinément le tokenizer lors de l'exportation. Il a été renommé en `scripts/reset_token.py`.
+- **Crash au chargement pour l'exportation** : `export.py` a été modifié pour gérer le chargement correct des modèles à partir des checkpoints d'entraînement (dictionnaires de poids + `log_active.json` pour la configuration) au lieu de supposer que l'objet PyTorch complet était sauvegardé, évitant ainsi le crash `AttributeError: 'dict' object has no attribute 'eval'`.
 
 ---
 
 ## [1.5.1] — 2026-06-25 9h20.am
 
-### Moteur analytique Julia — Prédictions avancées de convergence
+### ✨ Ajouté
 
-- **`src/estimations.jl`** — nouveau processus Julia tournant en arrière-plan aux côtés du script Python d'entraînement. Effectue deux analyses que Python ne peut pas faire efficacement :
-  - **Risque d'overfitting Chinchilla** — calcule le ratio paramètres/tokens et classe le risque en `faible`, `modéré`, `élevé` ou `critique` selon la loi d'échelle de Chinchilla (cible : ≥ 20 tokens par paramètre).
-  - **Prédiction de plateau par courbe exponentielle** — ajuste une courbe `L(s) = a + b·exp(-c·s)` via `LsqFit.jl` pour estimer la perte asymptotique vers laquelle le modèle converge et le nombre d'étapes restantes. Niveau de confiance rapporté (`haute`, `bonne`, `faible`).
-- **IPC par fichiers** — Julia lit `model/{nom}/log_active.json` (écrit par Python) et produit `model/{nom}/insights.json`. Les deux processus ne se bloquent jamais.
-- **Installation automatique de Julia** — `src/require.py` appelle `check_and_install_julia()` au démarrage. Sur Windows, installe silencieusement Julia via `winget install --id Julialang.Juliaup -e --silent` si introuvable. Sur les autres plateformes, affiche une invite d'installation manuelle. Les paquets `LsqFit` et `JSON` sont installés/vérifiés avec `Pkg.add([...])`.
-- **Dégradation gracieuse** — si Julia est absent ou que les paquets ne sont pas encore installés, `go.py` passe le processus Julia sans planter. Le dashboard affiche `"en attente de Julia..."` à la place d'une erreur.
+- **Moteur analytique Julia — Prédictions avancées de convergence**
+  - **`src/estimations.jl`** — nouveau processus Julia tournant en arrière-plan aux côtés du script Python d'entraînement. Effectue deux analyses que Python ne peut pas faire efficacement :
+    - **Risque d'overfitting Chinchilla** — calcule le ratio paramètres/tokens et classe le risque.
+    - **Prédiction de plateau par courbe exponentielle** — ajuste une courbe pour estimer la perte asymptotique.
+  - **IPC par fichiers** — Julia lit `model/{nom}/log_active.json` et produit `model/{nom}/insights.json`.
+  - **Installation automatique de Julia** — `src/require.py` appelle `check_and_install_julia()` au démarrage.
+  - **Dégradation gracieuse** — si Julia est absent, passe le processus sans planter.
+- **Sauvegarde du meilleur modèle** : `nanogpt_bpe.py` sauvegarde désormais `best_model.pt` chaque fois que `val_loss` atteint un nouveau record absolu.
+- **Tests** : **`tests/test_all.py`** — suite de tests automatisés couvrant toutes les fonctionnalités de la v1.5.1.
 
-### Learning Rate adaptatif (Cosine Decay)
+### ♻️ Modifié
 
-- **`get_lr(iteration)`** dans `nanogpt_bpe.py` — remplace le taux d'apprentissage fixe par un planning en deux phases :
-  - **Warmup** (100 premières étapes) : le LR monte linéairement de `lr/100` jusqu'à `learning_rate`.
-  - **Cosine decay** (étapes suivantes) : le LR suit une courbe en cosinus de `learning_rate` jusqu'à `learning_rate × 0.1`. C'est le même planning que GPT-3, LLaMA et Mistral.
-- Le LR courant est enregistré dans `log_active.json` sous la clé `lr_actuel` à chaque évaluation.
-
-### Sauvegarde du meilleur modèle
-
-- `nanogpt_bpe.py` sauvegarde désormais `best_model.pt` (en plus de `checkpoint.pt`) chaque fois que `val_loss` atteint un nouveau record absolu. Si l'entraînement dépasse l'optimum ou commence à overfitter, les meilleurs poids sont toujours conservés.
-
-### Dashboard — Intégration des métriques Julia
-
-- **Carte Learning Rate** — nouvelle carte dans la rangée des métriques principales affichant la valeur LR courante et indiquant si on est en phase de warmup ou de cosine decay.
-- **Prédiction de plateau (Julia)** — la cellule "Plateau estimé" dans la section Tendances affiche maintenant le résultat du fit exponentiel de Julia (`~2.87` de perte cible, `~800 étapes restantes`, niveau de confiance) à la place de l'ancienne estimation JavaScript linéaire.
-- **Cellule Overfitting Chinchilla** — nouvelle cellule dans la section Tendances affichant le niveau de risque (`FAIBLE` / `MODÉRÉ` / `ÉLEVÉ` / `CRITIQUE`) avec codage couleur (vert / jaune / rouge) et le ratio brut.
-- **`fetchLog()`** mis à jour pour récupérer aussi `insights.json` et le fusionner dans l'objet de données du dashboard à chaque cycle de polling.
-
-### Tests
-
-- **`tests/test_all.py`** — suite de tests automatisés couvrant toutes les fonctionnalités de la v1.5.1 :
-  - Détection du binaire Julia
-  - Vérification des paquets `LsqFit` + `JSON` (installation automatique si manquants)
-  - Courbe d'entraînement synthétique → Julia génère `insights.json` → résultats validés
-  - Scheduler cosine decay : assertions sur la montée en warmup, la descente en cosinus et la valeur finale
-  - **Auto-nettoyage** : sauvegarde et restaure tout `active.json` existant ; supprime tous les artefacts de test après exécution.
+- **Learning Rate adaptatif (Cosine Decay)**
+  - **`get_lr(iteration)`** dans `nanogpt_bpe.py` — remplace le taux d'apprentissage fixe par un planning en deux phases (Warmup puis Cosine decay).
+  - Le LR courant est enregistré dans `log_active.json`.
+- **Dashboard — Intégration des métriques Julia**
+  - **Carte Learning Rate** — nouvelle carte dans la rangée des métriques principales.
+  - **Prédiction de plateau (Julia)** — la cellule "Plateau estimé" affiche maintenant le résultat du fit exponentiel de Julia.
+  - **Cellule Overfitting Chinchilla** — nouvelle cellule affichant le niveau de risque.
 
 ---
 
 ## [1.5.0] — 2026-06-24 18h13.pm
 
+### ✨ Ajouté
 
-### Bot de téléchargement — vraies tailles et sources personnalisées
+- **Bot de téléchargement — vraies tailles et sources personnalisées**
+  - **Vraies tailles de datasets HuggingFace** — `obtenir_taille_hf()` interroge l'API HuggingFace.
+  - **Affichage des tailles dans le menu** — chaque source affiche maintenant la taille max et typique.
+  - **Sources personnalisées** (`src/custom_sources.json`) — ajout de ses propres datasets sans toucher au code.
+  - **Filtre de langue sur les datasets HuggingFace** — champ `langue_cible` ajouté.
+  - **Sélection de langue obligatoire** — refuse désormais une entrée vide.
+  - **Intégration de `langdetect`** — bibliothèque optionnelle importée au démarrage.
+- **Rechargement à chaud et checkpoints pendant l'entraînement**
+  - **Hot-reload** — après téléchargement d'une nouvelle source, l'entraînement la prend en compte à chaud via `reload_requested.flag`.
+  - **Sauvegarde des checkpoints pendant l'entraînement** — les checkpoints sont sauvegardés toutes les `checkpoint_interval` étapes.
 
-- **Vraies tailles de datasets HuggingFace** — `obtenir_taille_hf()` interroge l'API HuggingFace (`load_dataset_builder`) pour obtenir les tailles réelles au lieu de valeurs manuelles. Résultats mis en cache dans `src/sizes_cache.json` (30 jours). Fetch paresseux (déclenché à l'affichage d'une catégorie, pas au démarrage). `taille_max_mo` dans `SOURCES` sert de fallback si l'API est indisponible.
-- **Affichage des tailles dans le menu** — chaque source affiche maintenant `Max: ~4 Go  Typique: 800 Mo` avec un badge de taille. Si la quantité demandée dépasse le max, un avertissement est affiché et le téléchargement est plafonné automatiquement.
-- **Sources personnalisées** (`src/custom_sources.json`) — ajout de ses propres datasets HuggingFace sans toucher au code Python. Un nouveau sous-menu `[ +]` guide à travers les champs requis (chemin HF, champ texte, langue, taille max). Les sources custom apparaissent dans le menu avec le badge `[CUSTOM]` et sont fusionnées dans `SOURCES` au démarrage.
-- **Filtre de langue sur les datasets HuggingFace** — champ `langue_cible` ajouté aux sources qui mélangent plusieurs langues (ex : `oasst2` qui contient FR/EN/DE/ES/ZH). Chaque texte extrait passe par `detecter_langue()` et est ignoré s'il ne correspond pas à la langue cible, garantissant des datasets propres.
-- **Sélection de langue obligatoire** — `_demander_liste(defaut=None)` refuse désormais une entrée vide, forçant un choix explicite de langue en mode preset et en mode personnalisé. Plus de valeur par défaut silencieuse.
-- **Intégration de `langdetect`** — bibliothèque optionnelle (~2 Mo) importée au démarrage avec `try/except`. Si disponible, elle offre ~95% de précision sur 55 langues ; sinon, retour automatique sur la détection par mots-clés existante.
+### ♻️ Modifié
 
-### Système de manifeste — 50% d'espace disque économisé
-
-- **`data/{langue}/manifest.json`** remplace la copie dans `data.txt`. Au lieu de concaténer toutes les sources en un gros `data.txt` (ce qui doublait l'espace disque), un manifeste JSON léger liste les fichiers sources actifs. Le tokenizer et le moteur d'entraînement les lisent directement en streaming. Sur un dataset de 950 Mo, l'espace utilisé passe de ~1,9 Go à ~950 Mo.
-- **`telecharger.py`** — `combiner_sources()` remplacé par `maj_manifest()` qui écrit le manifeste sans copier aucun fichier. `reload_requested.flag` est créé après chaque téléchargement réussi.
-- **`tokenizer.py`** — lit via `manifest.json` en priorité (streaming, jusqu'à 50 Mo d'échantillon), bascule sur `data.txt` si aucun manifeste n'est trouvé.
-- **`nanogpt_bpe.py`** — lit les données d'entraînement via le manifeste. Vérification de validité du cache étendue pour comparer les dates de modification des sources avec le cache BPE.
-
-### Rechargement à chaud et checkpoints pendant l'entraînement
-
-- **Hot-reload** — après le téléchargement d'une nouvelle source, `telecharger.py` crée `data/{langue}/reload_requested.flag`. À chaque checkpoint (toutes les `checkpoint_interval` étapes), `nanogpt_bpe.py` détecte ce flag, le supprime, ré-tokenise toutes les sources (anciennes + nouvelles), et reprend l'entraînement exactement à la même étape. Aucun redémarrage nécessaire.
-- **Sauvegarde des checkpoints pendant l'entraînement** — était entièrement absent de la boucle d'entraînement malgré la configuration de `checkpoint_interval`. Les checkpoints sont maintenant sauvegardés toutes les `checkpoint_interval` étapes (pas seulement en toute fin d'entraînement), permettant la reprise après crash, le hot-reload et la boucle de reprise automatique de `go.py`.
+- **Système de manifeste — 50% d'espace disque économisé**
+  - **`data/{langue}/manifest.json`** remplace la copie dans `data.txt`, lu en streaming.
+  - **`telecharger.py`** — écrit le manifeste sans copier aucun fichier.
+  - **`tokenizer.py`** et **`nanogpt_bpe.py`** modifiés pour lire via le manifeste.
 
 ---
 
 ## [1.4.0] — 2026-06-24 9h22.am
 
-### Bot automatique & téléchargement
+### ✨ Ajouté
 
-- **Bot automatique** (`[a]` dans la bibliothèque, ou par défaut au premier lancement) — système de téléchargement intelligent qui détecte l'espace disque (plafond : 30 % de la capacité totale, max 2 Go) et propose deux modes :
-  - **Mode preset** — Nano (~100 Mo) / Small (~300 Mo) / Medium (~700 Mo) / Large (~1,5 Go)
-  - **Mode personnalisé** — choix du nombre de paramètres (20M → 1B+), Mo recommandés calculés automatiquement, plafond ajustable, langue (FR / EN / Multi), type d'IA (Général / Code / Sciences / Chat / Assistant). Sources sélectionnées intelligemment selon la combinaison.
-- **Retry HuggingFace** — jusqu'à 4 tentatives avec backoff exponentiel (3s, 8s, 20s) en cas de connexion coupée (`WinError 10054`). Reconnexion en cours d'itération : recharge le dataset et saute les articles déjà écrits.
-- **Correction menu bibliothèque** — une entrée vide ou invalide ne quitte plus le programme ; boucle jusqu'à un choix valide.
+- **Bot automatique & téléchargement**
+  - **Bot automatique** (`[a]` dans la bibliothèque) — système de téléchargement intelligent (Preset ou Personnalisé).
+  - **Retry HuggingFace** — jusqu'à 4 tentatives en cas de connexion coupée.
+- **Logs & auto-réparation**
+  - **`src/bot_logger.py`** — système de logs structuré pour le bot.
+  - **Auto-réparation** — désinstalle et réinstalle automatiquement via pip les dépendances corrompues.
+  - **`tests/test_sources.py`** — vérifie la rapidité et la validité des sources HF.
+- **Nouvelles commandes**
+  - `./wish token`, `./wish repair`, `./wish logs`, `./wish chat --terminal`
 
-### Logs & auto-réparation
+### ♻️ Modifié
 
-- **`src/bot_logger.py`** — système de logs pour le bot :
-  - `system/logs/bot.log` — tous les événements (INFO, WARNING, ERROR, FATAL)
-  - `system/logs/erreurs.log` — erreurs uniquement, pour diagnostic rapide
-  - `system/logs/downloads.log` — JSON Lines structuré par téléchargement (source, Mo, succès/échec, horodatage)
-  - Rotation automatique à 2 Mo, conserve 3 fichiers
-- **Auto-réparation** — si une dépendance (`datasets`, `torch`, `safetensors`…) est absente ou corrompue (ImportError / OSError), elle est automatiquement désinstallée et réinstallée via pip avant une nouvelle tentative. Intégré directement dans `telecharger_hf`.
-- **`tests/test_sources.py`** — envoie une requête de ~1 Mo à chaque source HuggingFace et affiche ✅ / ❌ + top 5 des sources les plus rapides.
+- **Tokenizer** : **Taille d'échantillon dynamique** — utilise 15 % du fichier (min 5 Mo, max 50 Mo) au lieu de 5 Mo fixes.
 
-### Nouvelles commandes
+### 🐛 Corrigé
 
-- **`./wish token`** — supprime `system/tokenizer.json` (et les tokenizers des modèles) puis réentraîne immédiatement le tokenizer BPE sur les données existantes. `./wish token reset` supprime uniquement (réentraînement différé au prochain `./wish go`).
-- **`./wish repair`** — vérifie tous les paquets critiques et réinstalle automatiquement ceux qui sont absents ou corrompus.
-- **`./wish logs`** — affiche les 40 derniers événements du bot. `./wish logs erreurs` pour les erreurs uniquement. `./wish logs repair` pour réparer et logger en une commande.
-- **`./wish chat --terminal`** — mode génération terminal (fusionné depuis `src/generate.py` supprimé) : liste les modèles disponibles, choix, boucle interactive (`t=`, `n=`, `q`).
-
-### Tokenizer
-
-- **Taille d'échantillon dynamique** — l'entraînement BPE du tokenizer utilise désormais 15 % du fichier de données (min 5 Mo, max 50 Mo) au lieu d'un fixe 5 Mo. Sur un dataset de 252 Mo : ~38 Mo utilisés, vocabulaire bien plus représentatif.
+- **Menu bibliothèque** : une entrée vide ou invalide ne quitte plus le programme.
 
 ---
 
 ## [1.3.3] — 2026-06-24 8h26.am
 
-### Système de raccourcis
+### ✨ Ajouté
 
-- **`wish.bat`** — système de raccourcis unifié à la racine. Point d'entrée unique pour toutes les commandes :
-  ```
-  ./wish go        Menu principal
-  ./wish chat      Interface de chat
-  ./wish quick     Entraînement rapide (zéro config, ~20M params)
-  ./wish config    Gestion des modèles et données
-  ./wish serve     Serveur dashboard / bibliothèque
-  ./wish visual    Visualiseur d'embeddings (port 8080)
-  ```
-- **`scripts/config.py`** — nouvelle option **[16] Désinstaller les dépendances** : lance `pip uninstall -y` sur tous les paquets de `requirements.txt` sans toucher à `deps.lock`.
+- **Système de raccourcis (`wish.bat`)** — point d'entrée unique (`go`, `chat`, `quick`, `config`, `serve`, `visual`).
+- **Désinstallation des dépendances** : nouvelle option `[16]` dans `config.py`.
 
 ---
 
 ## [1.3.2] — 2026-06-24 07:54.am
 
-### Structure du projet
+### ♻️ Modifié
 
-- **Racine nettoyée** : seulement 8 fichiers à la racine (`go.py`, `dashboard.html`, `README.md`, `LICENSE`, `CHANGELOG.md`, `CONTRIBUTING.md`, `DATASETS.md`, `requirements.txt`).
-- **`scripts/`** — scripts de lancement déplacés ici : `chat.py`, `quick.py`, `serve.py`, `config.py`.
-- **`docs/`** — documentation déplacée ici : `PARAMETRES.md`, `LAUNCH.md` (guide de lancement communauté).
-- **`web/`** — `library.html` déplacé ici.
-- **`system/`** — `pyrightconfig.json` et `tokenizer.json` déplacés ici. Tous les chemins mis à jour dans `src/`.
-- **`wish.bat`** — lanceur unique à la racine. Remplace 5 fichiers `.bat` individuels.
-  ```
-  ./wish go | chat | quick | config | serve | visual
-  ```
+- **Structure du projet**
+  - Racine nettoyée (8 fichiers restants).
+  - Scripts de lancement dans `scripts/`.
+  - Documentation dans `docs/`.
+  - Interface web dans `web/`.
+  - Fichiers système (`session.json`, etc.) dans `system/`.
 
 ---
 
 ## [1.3.1] — 2026-06-23 20:07.pm
 
-### Améliorations du visualiseur d'embeddings
+### ♻️ Modifié
 
-- **Couleurs plates** : suppression de tous les effets néon/glow (`ctx.shadowBlur`, `ctx.shadowColor`). Les couleurs sont désormais solides et sobres — mots `#4db8cc`, chiffres `#c8a830`, caractères spéciaux `#c04060`.
-- **Labels uniquement au survol** : les noms de tokens ne s'affichent plus automatiquement en zoomant. Ils apparaissent exclusivement au hover, avec un anneau blanc + point plein et le nom au-dessus.
-- **Système de filtres** : cinq boutons dans la topbar — *Tous*, *Mots*, *Chiffres*, *Spéciaux*, *Fins de mot*. Les tokens hors filtre sont atténués à 8% d'opacité. L'état du filtre se combine avec la barre de recherche.
-- **Tokens fin-de-mot** (`</w>`) dessinés à 75% du rayon de base pour les distinguer visuellement.
-- **Style** : `visual/style.css` mis à jour avec les styles `.filter-btn` et `.filter-btn.active`.
+- **Améliorations du visualiseur d'embeddings**
+  - Couleurs plates (suppression des effets néon/glow).
+  - Labels affichés uniquement au survol.
+  - Système de filtres intelligent (Mots, Chiffres, Spéciaux, etc.).
+  - Tokens fin-de-mot (`</w>`) réduits visuellement.
 
 ---
 
 ## [1.3.0] — 2026-06-23 19:34.pm
 
-### Interface de chat — refonte complète
+### ✨ Ajouté
 
-- **Suppression de la topbar** : la barre de navigation du haut a été retirée entièrement. L'interface est maintenant fullscreen, sans en-tête fixe.
-- **Barre d'input pill** : la zone de saisie est désormais une capsule très arrondie (`border-radius: 32px`), centrée verticalement à l'écran au démarrage, puis ancrée en bas lors du premier envoi.
-- **Sélecteur de modèle intégré** : le dropdown de modèles est maintenant intégré directement sous le textarea (plus de panneau séparé). Les modèles sont triés par taille décroissante. Le bouton **Charger** se transforme en **✓ En cache** (vert, désactivé) quand le modèle actif est déjà en mémoire.
-- **"Plus d'options" avec fade-in** : Température et Longueur sont cachées derrière un bouton ⚙ discret. Le panneau s'ouvre et se ferme avec une transition fluide (`max-height` + `opacity` + `padding`) — pas de saut brutal.
-- **Sidebar flottante** : l'historique des conversations s'ouvre via un bouton ☰ flottant en haut à gauche. Ce bouton disparaît quand la sidebar est ouverte. La sidebar est une carte flottante arrondie avec effet glassmorphism (`backdrop-filter: blur`), entièrement désolidarisée du flux du document.
-- **Glow violet aux bords** : le fond de l'interface affiche 4 blobs elliptiques violets aux coins de l'écran via des dégradés radiaux Canvas 2D — le point cloud 3D a été retiré.
-- **Bulles de chat améliorées** :
-  - Arrondi renforcé, animation d'entrée (`fadeIn` + `translateY(8px) → 0`)
-  - Chaque réponse IA affiche, au survol, une rangée d'actions : bouton **Copier**, temps de réponse en millisecondes, nombre de tokens générés, et bouton **↺ Régénérer**
-  - Le bouton Copier affiche temporairement « ✓ Copié ! » en vert après le clic
-- **Régénération** : le bouton ↺ supprime la dernière réponse IA et relance la génération à partir du dernier message utilisateur, sans recharger la page.
-- **Chargement automatique au changement de modèle** : sélectionner un modèle dans le dropdown déclenche son chargement immédiatement. Si le modèle est déjà en mémoire (`_cachedModelName`), aucun rechargement n'est effectué — cache côté client.
-- **Historique IndexedDB** : les conversations sont persistées dans IndexedDB (`WishAIChat` / `convs`), récupérées au démarrage, et accessibles depuis la sidebar.
+- **Historique IndexedDB** dans l'interface de chat.
 
-### Corrections
+### ♻️ Modifié
 
-- **Mismatch d'architecture dans `chat_server.py`** : l'ancienne fonction `build_modele()` utilisait une architecture GPT-2 (position embedding appris, `tril`, `ReLU`, `LayerNorm`) incompatible avec les modèles entraînés via `model.py` (RoPE + RMSNorm + SwiGLU). Corrigé en remplaçant `build_modele()` par un import direct de `WishAI_BPE` et `ConfigModele` depuis `src/model.py`.
-- **Espaces manquants dans le texte généré** : le streaming token par token utilisait `tok.decoder()` qui appelle `.strip()` et supprimait les espaces en fin de mot (marqueur `</w>` BPE). Corrigé avec une fonction `decode_token(id)` dédiée qui convertit `</w>` → espace sans `.strip()`.
-- **`KeyError: 'hyperparams'`** : compatibilité entre l'ancien format de checkpoint (`hyperparams` / `taille_vocab`) et le nouveau format (`architecture` avec `vocab_size` inclus). `_charger_modele()` détecte la clé présente et s'adapte.
+- **Interface de chat — refonte complète**
+  - Suppression de la topbar, input pill arrondi.
+  - Sélecteur de modèle intégré, panneau d'options fluide.
+  - Sidebar flottante pour l'historique avec effet glassmorphism.
+  - Glow violet en fond d'écran.
+  - Bulles de chat améliorées (animations, bouton copier, vitesse).
+  - Bouton **↺ Régénérer** pour relancer la génération.
+  - Chargement automatique au changement de modèle (cache côté client).
+
+### 🐛 Corrigé
+
+- **Mismatch d'architecture dans `chat_server.py`** : correction de l'import pour supporter l'architecture RoPE/SwiGLU.
+- **Espaces manquants** : ajout de `decode_token(id)` pour éviter les `strip()` intempestifs sur `</w>`.
+- **`KeyError: 'hyperparams'`** : rétrocompatibilité des anciens checkpoints.
 
 ---
 
 ## [1.2.0] — 2026-06-21 18:28.pm
 
-### Dashboard — UI complète
+### ✨ Ajouté
 
-- **Écran idle animé** : quand aucun entraînement ne tourne, le dashboard affiche
-  un écran d'attente avec particules flottantes, cerveau animé, grille en mouvement
-  et un indicateur de pulse. Auto-redirect `file://` → `localhost` (port mémorisé
-  en `localStorage`).
-- **Bannière "Entraînement terminé"** : barre verte qui glisse du haut avec les
-  statistiques clés (val loss final, durée, étapes) dès que le statut passe
-  à `terminé`.
-- **4 sections dépliables** (état mémorisé entre les rechargements) :
-  - **📈 Tendances & Convergence** — Δ val loss sur 10 évals, tendance
-    (descend / plateau / overfitting), vitesse de descente (delta/100 étapes),
-    plateau estimé automatiquement
-  - **⚡ Performance réelle** — tokens/s, Mo de texte traités, batch effectif
-    (batch × grad_accum), nombre de checkpoints créés
-  - **🧠 Analyse du modèle** — params/couche, VRAM théorique (~4 o/param),
-    head size (n_embd ÷ n_head), état d'apprentissage avec conseil adapté
-  - **📋 Journal des événements** — records val_loss, pauses thermiques/RAM,
-    convergence — chaque événement horodaté par étape
-- **Dernier texte généré** : affiché en bas de page avec bouton
-  "Voir tout / Réduire" (expand/collapse).
-- **Suivi de session** : `session.json` écrit par `go.py` au démarrage ; le
-  dashboard le surveille via SSE et remet l'affichage à zéro automatiquement
-  quand une nouvelle session démarre.
-- **Tableau des hyperparamètres + diagramme d'architecture** : section fixe
-  sous les graphes qui affiche tous les paramètres du modèle en cours et un
-  schéma visuel de l'architecture.
+- **Dashboard — UI complète**
+  - Écran idle animé avec redirection auto.
+  - Bannière de fin d'entraînement.
+  - 4 sections dépliables (Tendances, Performance, Analyse, Journal).
+  - Affichage du dernier texte généré et tableau hyperparamètres.
+  - Suivi de session en temps réel.
+- **`quick.py`** — mode rapide zéro config.
+- **Interface de chat** web et script serveur `serve.py`.
+- Boucle de reprise automatique phase 3 dans `go.py`.
 
-### Nouveau
+### 🐛 Corrigé
 
-- **`quick.py`** — mode rapide zéro config : génère un texte de démo si aucune
-  donnée n'existe (~200 phrases FR/EN), entraîne le tokenizer BPE, lance le
-  dashboard et démarre l'entraînement avec le preset MINI (~20M paramètres).
-  Aucune question posée — `Ctrl+C` pour arrêter.
-- **Interface de chat** (`chatting/`, `chat.py`, `src/chat_server.py`) — parle
-  avec ton modèle entraîné depuis une interface web. Historique des conversations
-  persistant, sélecteur de modèle, chargement à chaud sans redémarrer le serveur.
-- **`serve.py`** — lance uniquement le serveur de chat sans passer par `go.py`.
-- **`go.py` — ouverture optionnelle de la bibliothèque** : si des données existent
-  déjà, propose d'ouvrir la bibliothèque pour en rajouter avant de commencer.
-- **`go.py` — boucle de reprise phase 3** : si `monitor.py` déclenche un arrêt
-  critique, `go.py` attend la reprise automatique et relance l'entraînement depuis
-  le checkpoint sans intervention manuelle.
+- Code dupliqué dans `library.html`.
+- Import manquant dans `telecharger.py`.
 
-### Corrections
+### 📄 Documentation
 
-- `library.html` — blocs de code dupliqués supprimés dans `loadLocalData()` et
-  `checkServer()` (erreurs JS lignes 334 et 559)
-- `src/telecharger.py` — `import sys` manquant alors que `sys.exit(1)` est utilisé
-- `pyrightconfig.json` créé — Pylance pointe sur `.venv312` ; plus d'avertissements
-  "import could not be resolved" dans VSCode
-- `.gitignore` — `tests/` retiré (bug : `tests/test_smoke.py` n'était jamais tracké)
-  ; `.ruff_cache/`, `monitor_port.json`, `deps.lock` ajoutés
-
-### Documentation
-
-- `config.py` — menu complet des 16 commandes documenté dans `README.md` et
-  `README_FR.md` en volet déroulant (liste, hyperparamètres, export, reset, logs…)
+- Menu `config.py` documenté dans le README.
 
 ---
 
 ## [1.1.0] — 2026-06-21 18:20.pm
 
-### Architecture
+### ♻️ Modifié
 
-- **Modele modernise (RoPE + RMSNorm + SwiGLU)** : `model.py` passe d'une
-  architecture GPT-2 (2019) a une architecture style LLaMA/Mistral (2024).
-  - `LayerNorm` remplace par `RMSNorm` (plus simple, plus rapide, pas de biais)
-  - Positional embeddings appris supprimes, remplace par **RoPE** (Rotary Position
-    Embedding) — meilleure generalisation sur les longues sequences
-  - FFN `Linear → ReLU → Linear` remplace par **SwiGLU** (`SiLU(gate) * up → down`)
-    — meilleure loss a budget de parametres egal
-  - Toutes les couches lineaires passent sans biais (`bias=False`)
-  - `nn.Sequential` des blocs remplace par `nn.ModuleList` + boucle (necessaire
-    pour passer `cos`/`sin` RoPE a chaque bloc)
-  - Comptage de parametres MINI inchange : **20.8M** (la suppression du
-    `position_embedding` compense les 3 projections SwiGLU vs 2)
+- **Architecture modernisée** : passage de GPT-2 (2019) à LLaMA/Mistral (2024).
+  - RMSNorm, RoPE, SwiGLU, sans biais (`bias=False`).
 
-### Bugs corriges
+### ⚡ Amélioré
 
-- **`data/data.txt` vide bloquait le tokenizer** : `donnees_existent()` (dans
-  `quick.py` et `go.py`) et `trouver_data_file()` (dans `tokenizer.py`) renvoient
-  desormais `False`/`None` si le fichier fait moins de 1 Ko — evite un
-  entraînement BPE sur texte vide (vocab = 1 token, tout encode en `</w>`)
+- Port monitor dynamique (`monitor_port.json`).
+- Avertissement virtualenv.
+- **Dashboard SSE** : passage en Server-Sent Events au lieu du polling setInterval.
+- Comparaison multi-modèles dans le dashboard.
+- Filtrage qualité robuste pour Common Crawl.
 
-### Ameliorations
+### 🐛 Corrigé
 
-- **Port monitor dynamique** : `monitor.py` cherche un port TCP libre au lieu
-  de hardcoder 8001. Le port est ecrit dans `monitor_port.json` pour que
-  `dashboard.py` puisse le lire. Plus de clash silencieux si le port est pris.
-- **Avertissement virtualenv dans `require.py`** : si Python tourne hors venv
-  (et hors conda), l'utilisateur voit un message clair et doit confirmer avant
-  toute installation globale.
-- **Dashboard SSE** : le polling `setInterval` (toutes les 2-3s) est remplace
-  par **Server-Sent Events** — `dashboard.py` expose `/api/events` qui pousse
-  les logs d'entrainement, les changements de session, et les donnees monitor
-  en temps reel. Fallback polling automatique en cas d'echec SSE ou ouverture
-  en `file://`. `dashboard.py` passe en `ThreadingHTTPServer` pour gerer
-  plusieurs connexions simultanees.
-- **Comparaison multi-modeles dans le dashboard** : bouton "Comparer les modeles"
-  qui ouvre un panneau avec toutes les courbes de loss superposees (endpoint
-  `/api/models` retourne les historiques de tous les modeles entraines).
-- **Filtrage qualite Common Crawl** : `nettoyer_texte()` dans `telecharger.py`
-  fait desormais 4 passes : suppression HTML residuel (`<tag>`, `&amp;`...),
-  filtrage ligne par ligne (< 40 chars, 2+ URLs, emails, ponctuation > 15%),
-  deduplication des lignes repetees (spam/boilerplate), nettoyage non-latin.
+- Protection contre le plantage si `data.txt` est vide.
 
-### Documentation
+### 📄 Documentation
 
-- **`CONTRIBUTING.md`** cree : structure du projet, workflow, standards de code,
-  zones sensibles, guide PR, idees de contributions.
+- **`CONTRIBUTING.md`** créé.
 
 ---
 
 ## [1.0.0] — 2026-06-21 18:20.pm
 
-Première version stable. Passe en revue du code, correction des bugs et ajout
-d'un filet de sécurité (tests).
-
-### 🐞 Bugs corrigés
-
-- **`nanogpt_bpe.py` — ligne parasite `shu`** : une ligne `shu` traînait en fin
-  de fichier (au niveau module). Elle provoquait un `NameError` à l'exécution,
-  juste après la sauvegarde du modèle. Supprimée.
-- **`telecharger.py` — `supprimer_donnees()` non définie** : le menu appelait
-  cette fonction (option « s ») mais elle n'existait nulle part → `NameError` au
-  clic. Fonction implémentée (suppression d'une source, du `data.txt` combiné, ou
-  de tout, par langue, avec espace libéré affiché).
-- **Tokenizer non réentraîné au changement de dataset** : il fallait supprimer
-  `tokenizer.json` à la main, sinon le modèle s'entraînait sur un vocabulaire qui
-  ne correspondait plus aux données (bug silencieux). Désormais une **signature**
-  du dataset est stockée dans `tokenizer.json` et comparée à chaque lancement → 
-  réentraînement automatique si nécessaire.
-  - Sous-bug corrigé : la comparaison de `vocab_size` faisait boucler le
-    réentraînement à l'infini sur les petits datasets (le vocab réel pouvant être
-    plus petit que la cible). La détection repose maintenant uniquement sur la
-    signature (qui encode déjà le vocab cible).
-  - Sous-bug corrigé : valeur par défaut figée au chargement du module (piège
-    classique de Python) — le vocab cible est désormais lu à l'exécution.
-- **`control.json` — écriture non atomique** : en cas de crash en plein write, le
-  fichier pouvait être corrompu et faire planter les processus qui le lisent.
-  Passé en écriture atomique (fichier `.tmp` + `os.replace`) dans les **3**
-  écrivains : `go.py`, `monitor.py`, `nanogpt_bpe.py`.
-- **Dashboard — clignotement au démarrage** : au lancement, le dashboard
-  s'affichait une fraction de seconde puis repassait sur l'écran « En attente ».
-  Cause : deux pollers en conflit (`checkSession` mettait l'état à « starting »,
-  `update()` le forçait à « idle » tant qu'aucun log n'existait). Corrigé avec une
-  fenêtre de grâce de démarrage **et** une vérification de fraîcheur de session
-  (un vieux `session.json` ne déclenche plus de faux « démarrage »).
-
-### 🧹 Nettoyage du code
-
-- **Imports inutilisés retirés** : `json` (`chat.py`), `shutil` et `math as
-  _math2` (`nanogpt_bpe.py`), `parse_qs` (`dashboard.py`), `sys`
-  (`tokenizer.py`, `telecharger.py`), `platform` / `os` / `urllib.request` /
-  `tempfile` (`require.py`), et `torch.nn` / `functional as F` (`nanogpt_bpe.py`,
-  après extraction du modèle).
-- **Variable morte `_head_size_rec`** supprimée (`nanogpt_bpe.py`).
-- **`global _st` redondant** supprimé (`chat_server.py`).
-- **28 f-strings sans variable** (`f"..."` sans `{}`) nettoyés dans
-  `telecharger.py`, `tokenizer.py`, `nanogpt_bpe.py`, `monitor.py`.
+Première version stable. Passe en revue du code, correction des bugs et ajout d'un filet de sécurité (tests).
 
 ### ✨ Ajouté
 
-- **Support Apple Silicon (MPS)** : détection `torch.backends.mps.is_available()`
-  dans `verifier_pc()` (mémoire unifiée estimée pour la reco de preset). WishAI
-  ne force plus le CPU sur Mac.
-- **Précision mixte (AMP)** dans la boucle d'entraînement : `autocast` bf16/fp16,
-  avec **`GradScaler` en fp16** (indispensable pour éviter les NaN — oublié dans
-  le plan initial), activée uniquement sur CUDA pour ne pas casser MPS/CPU.
-- **`torch.compile`** activé sur Linux+CUDA uniquement (instable sur Windows/MPS),
-  avec routage des poids par un module « brut » pour des checkpoints toujours
-  compatibles (torch.compile préfixe sinon les clés avec `_orig_mod.`).
-- **Smoke tests** (`tests/test_smoke.py`, `unittest`, zéro dépendance) :
-  round-trip du tokenizer, détection de changement de dataset, forward pass +
-  loss, save/load de checkpoint, génération, et compilation de **tous** les
-  fichiers `.py` (ce dernier aurait attrapé le bug `shu`).
-  Lancement : `python -m unittest discover -s tests`.
+- **Support Apple Silicon (MPS)**.
+- **Précision mixte (AMP)** (autocast bf16/fp16).
+- **`torch.compile`** sur Linux+CUDA.
+- **Smoke tests** sans dépendances externes.
 
 ### ♻️ Modifié
 
-- **Modèle extrait dans `src/model.py`** : paramétré par `ConfigModele` (plus
-  aucune variable globale, `device` déduit du tenseur d'entrée). Rend le modèle
-  importable et testable **sans** déclencher l'entraînement, et allège
-  `nanogpt_bpe.py`.
+- Modèle extrait dans `src/model.py`.
+
+### 🐛 Corrigé
+
+- Ligne parasite `shu` dans `nanogpt_bpe.py`.
+- Erreur `NameError` sur `supprimer_donnees()`.
+- Tokenizer non réentraîné silencieusement (ajout de la signature du dataset).
+- Écriture de `control.json` rendue atomique.
+- Clignotement du dashboard au démarrage.
+
+### 🧹 Nettoyé
+
+- Imports inutilisés et variables mortes retirés.
+- Nettoyage des f-strings inutiles.
 
 ### 🗑️ Retiré
 
-- **`btn_dashboard.py` (bouton flottant Tkinter)** : purement visuel, et pouvait
-  crasher sur Linux headless (pas de serveur d'affichage). Le statut reste visible
-  dans le terminal et le dashboard. Le lancement dans `go.py` a aussi été retiré.
+- `btn_dashboard.py` (bouton flottant).
 
 ### 📄 Documentation
 
-- `README.md` et `README_FR.md` mis à jour pour la v1.0 (badge version, support
-  MPS, tokenizer automatique, section tests, suppression des références au bouton
-  flottant, structure de fichiers à jour).
+- Mise à jour des README.
