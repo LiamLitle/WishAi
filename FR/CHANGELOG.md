@@ -6,7 +6,75 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/). Heu
 
 ---
 
-## [1.5.0] — 2026-06-24 18h13
+## [1.5.2] — 2026-06-25 12h10.pm
+
+Mise à jour majeure améliorant la fiabilité de l'entraînement, les logs, et la structure interne.
+
+### Nouvelles Fonctionnalités & Entraînement
+
+- **Système de reprise d'entraînement (Recovery)** : L'IA sauvegarde maintenant son état avec robustesse, permettant de reprendre un entraînement exactement là où il s'est arrêté (utile en cas de crash, d'interruption volontaire ou d'erreur humaine).
+- **Logs avancés et système temporaire** : Création d'un sous-dossier `TEMP/` dédié avec horodatage précis (date exacte, heures, secondes) pour un historique granulaire des entraînements sans polluer le dossier principal.
+- **Enrichissement de `log_active.json`** : Ajout d'informations système cruciales en temps réel :
+  - Le statut d'activation d'AMP (Automatic Mixed Precision) et de `torch.compile()`.
+  - Le nombre réel de paramètres du modèle.
+  - Le statut d'encodage BPE et Tokenisation, incluant le pourcentage de téléchargement des données et les dossiers/fichiers spécifiques utilisés.
+- **Détection dynamique** : Amélioration de la détection du modèle en cours pour le dashboard (ne dépend plus aveuglément de `active.json`).
+
+### Interface & Visualisation
+
+- **Expérience Utilisateur (UX) du nuage de mots** : Le nuage de 4 000 tokens a été aplati de force en 2D strict (axe Z fixé à 0) et la rotation 3D a été désactivée, rendant l'interface beaucoup plus lisible.
+
+### Refonte de la Configuration & Bugfixes
+
+- **Architecture de configuration modulaire** : `scripts/config.py` a été refactorisé. Au lieu d'avoir tout dans un seul fichier géant, le code est désormais proprement séparé dans un dossier `scripts/Config/` (`donnees.py`, `modeles.py`, `systeme.py`, `utilitaires.py`).
+- **Correction du bug de "Shadowing" (`token.py`)** : Le script `scripts/token.py` créait un conflit avec les paquets Python standards, ce qui réinitialisait inopinément le tokenizer lors de l'exportation. Il a été renommé en `scripts/reset_token.py`.
+- **Optimisation de l'exportation ONNX/GGUF** : L'export des modèles se fait désormais de manière plus propre, directement dans le répertoire de chaque modèle (`model/<nom_du_modele>/`) avec l'ajout automatique du fichier `tokenizer.json`, au lieu de tout copier de force sur le Bureau.
+- **Correction du chargement pour l'exportation** : `export.py` a été modifié pour gérer le chargement correct des modèles à partir des checkpoints d'entraînement (dictionnaires de poids + `log_active.json` pour la configuration) au lieu de supposer que l'objet PyTorch complet était sauvegardé, évitant ainsi le crash `AttributeError: 'dict' object has no attribute 'eval'`.
+
+---
+
+## [1.5.1] — 2026-06-25 9h20.am
+
+### Moteur analytique Julia — Prédictions avancées de convergence
+
+- **`src/estimations.jl`** — nouveau processus Julia tournant en arrière-plan aux côtés du script Python d'entraînement. Effectue deux analyses que Python ne peut pas faire efficacement :
+  - **Risque d'overfitting Chinchilla** — calcule le ratio paramètres/tokens et classe le risque en `faible`, `modéré`, `élevé` ou `critique` selon la loi d'échelle de Chinchilla (cible : ≥ 20 tokens par paramètre).
+  - **Prédiction de plateau par courbe exponentielle** — ajuste une courbe `L(s) = a + b·exp(-c·s)` via `LsqFit.jl` pour estimer la perte asymptotique vers laquelle le modèle converge et le nombre d'étapes restantes. Niveau de confiance rapporté (`haute`, `bonne`, `faible`).
+- **IPC par fichiers** — Julia lit `model/{nom}/log_active.json` (écrit par Python) et produit `model/{nom}/insights.json`. Les deux processus ne se bloquent jamais.
+- **Installation automatique de Julia** — `src/require.py` appelle `check_and_install_julia()` au démarrage. Sur Windows, installe silencieusement Julia via `winget install --id Julialang.Juliaup -e --silent` si introuvable. Sur les autres plateformes, affiche une invite d'installation manuelle. Les paquets `LsqFit` et `JSON` sont installés/vérifiés avec `Pkg.add([...])`.
+- **Dégradation gracieuse** — si Julia est absent ou que les paquets ne sont pas encore installés, `go.py` passe le processus Julia sans planter. Le dashboard affiche `"en attente de Julia..."` à la place d'une erreur.
+
+### Learning Rate adaptatif (Cosine Decay)
+
+- **`get_lr(iteration)`** dans `nanogpt_bpe.py` — remplace le taux d'apprentissage fixe par un planning en deux phases :
+  - **Warmup** (100 premières étapes) : le LR monte linéairement de `lr/100` jusqu'à `learning_rate`.
+  - **Cosine decay** (étapes suivantes) : le LR suit une courbe en cosinus de `learning_rate` jusqu'à `learning_rate × 0.1`. C'est le même planning que GPT-3, LLaMA et Mistral.
+- Le LR courant est enregistré dans `log_active.json` sous la clé `lr_actuel` à chaque évaluation.
+
+### Sauvegarde du meilleur modèle
+
+- `nanogpt_bpe.py` sauvegarde désormais `best_model.pt` (en plus de `checkpoint.pt`) chaque fois que `val_loss` atteint un nouveau record absolu. Si l'entraînement dépasse l'optimum ou commence à overfitter, les meilleurs poids sont toujours conservés.
+
+### Dashboard — Intégration des métriques Julia
+
+- **Carte Learning Rate** — nouvelle carte dans la rangée des métriques principales affichant la valeur LR courante et indiquant si on est en phase de warmup ou de cosine decay.
+- **Prédiction de plateau (Julia)** — la cellule "Plateau estimé" dans la section Tendances affiche maintenant le résultat du fit exponentiel de Julia (`~2.87` de perte cible, `~800 étapes restantes`, niveau de confiance) à la place de l'ancienne estimation JavaScript linéaire.
+- **Cellule Overfitting Chinchilla** — nouvelle cellule dans la section Tendances affichant le niveau de risque (`FAIBLE` / `MODÉRÉ` / `ÉLEVÉ` / `CRITIQUE`) avec codage couleur (vert / jaune / rouge) et le ratio brut.
+- **`fetchLog()`** mis à jour pour récupérer aussi `insights.json` et le fusionner dans l'objet de données du dashboard à chaque cycle de polling.
+
+### Tests
+
+- **`tests/test_all.py`** — suite de tests automatisés couvrant toutes les fonctionnalités de la v1.5.1 :
+  - Détection du binaire Julia
+  - Vérification des paquets `LsqFit` + `JSON` (installation automatique si manquants)
+  - Courbe d'entraînement synthétique → Julia génère `insights.json` → résultats validés
+  - Scheduler cosine decay : assertions sur la montée en warmup, la descente en cosinus et la valeur finale
+  - **Auto-nettoyage** : sauvegarde et restaure tout `active.json` existant ; supprime tous les artefacts de test après exécution.
+
+---
+
+## [1.5.0] — 2026-06-24 18h13.pm
+
 
 ### Bot de téléchargement — vraies tailles et sources personnalisées
 
@@ -31,7 +99,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/). Heu
 
 ---
 
-## [1.4.0] — 2026-06-24 9h22
+## [1.4.0] — 2026-06-24 9h22.am
 
 ### Bot automatique & téléchargement
 
@@ -64,7 +132,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/). Heu
 
 ---
 
-## [1.3.3] — 2026-06-24 8h26
+## [1.3.3] — 2026-06-24 8h26.am
 
 ### Système de raccourcis
 
@@ -81,7 +149,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/). Heu
 
 ---
 
-## [1.3.2] — 2026-06-24 07:54
+## [1.3.2] — 2026-06-24 07:54.am
 
 ### Structure du projet
 
@@ -97,7 +165,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/). Heu
 
 ---
 
-## [1.3.1] — 2026-06-23 20:07
+## [1.3.1] — 2026-06-23 20:07.pm
 
 ### Améliorations du visualiseur d'embeddings
 
@@ -109,7 +177,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/). Heu
 
 ---
 
-## [1.3.0] — 2026-06-23 19:34
+## [1.3.0] — 2026-06-23 19:34.pm
 
 ### Interface de chat — refonte complète
 
@@ -135,7 +203,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/). Heu
 
 ---
 
-## [1.2.0] — 2026-06-21 18:28
+## [1.2.0] — 2026-06-21 18:28.pm
 
 ### Dashboard — UI complète
 
@@ -198,7 +266,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/). Heu
 
 ---
 
-## [1.1.0] — 2026-06-21 18:20
+## [1.1.0] — 2026-06-21 18:20.pm
 
 ### Architecture
 
@@ -251,7 +319,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/). Heu
 
 ---
 
-## [1.0.0] — 2026-06-21 18:20
+## [1.0.0] — 2026-06-21 18:20.pm
 
 Première version stable. Passe en revue du code, correction des bugs et ajout
 d'un filet de sécurité (tests).

@@ -314,7 +314,7 @@ def main():
     threading.Thread(target=srv.serve_forever, daemon=True).start()
 
     url     = "http://localhost:" + str(port) + "/dashboard.html"
-    lib_url = "http://localhost:" + str(port) + "/library.html"
+    lib_url = "http://localhost:" + str(port) + "/web/library.html"
     print("\n  dashboard    -> " + url)
     print("  bibliotheque -> " + lib_url)
     print("  Ctrl+C pour quitter\n")

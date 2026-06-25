@@ -1279,7 +1279,9 @@ def auto_bot():
 
     print()
     _telecharger_plan(sources_plan)
-    _maj_manifests([cle for cle, _ in sources_plan])
+    cles_dl = [cle for cle, _ in sources_plan]
+    _maj_manifests(cles_dl)
+    _combiner_et_copier(cles_dl)
 
 
 def main():

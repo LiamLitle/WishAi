@@ -130,43 +130,90 @@ class TokenizerBPE:
         print(f"  Caractères uniques : {n_base}")
         print(f"  Fusions à faire    : {n_fusions}")
 
-        # ── 3. Boucle BPE ────────────────────────────────────────
-        print("\n  [3/4] Fusions BPE (cette étape prend 1-5 min)...")
+        # ── 3. Boucle BPE (Optimisée par Index Inversé) ──────────
+        print("\n  [3/4] Fusions BPE (Optimisation Index Inversé - Très Rapide)...")
         merges = []
         debut  = time.time()
 
+        # Initialisation : comptage initial des paires et construction de l'index inversé
+        paires = defaultdict(int)
+        index = defaultdict(set)
+        
+        for mot, freq in vocab_mots.items():
+            # Remplir les paires
+            for j in range(len(mot) - 1):
+                paires[(mot[j], mot[j+1])] += freq
+            # Remplir l'index inversé
+            for sym in set(mot):
+                index[sym].add(mot)
+
         for i in range(n_fusions):
-
-            # Compter toutes les paires adjacentes
-            paires = defaultdict(int)
-            for mot, freq in vocab_mots.items():
-                for j in range(len(mot) - 1):
-                    paires[(mot[j], mot[j+1])] += freq
-
             if not paires:
                 print(f"  Plus de paires à fusionner à l'étape {i}.")
                 break
 
             # Paire la plus fréquente
-            meilleure  = max(paires, key=paires.get)
-            freq_max   = paires[meilleure]
+            meilleure = max(paires, key=paires.get)
+            freq_max  = paires[meilleure]
 
-            # Si la fréquence max tombe à 1, pas la peine de continuer
             if freq_max < 2:
                 print(f"  Fréquence max = 1 — arrêt à {i} fusions.")
                 break
 
-            # Fusion dans tout le vocabulaire de mots
-            vocab_mots = self._fusionner(meilleure, vocab_mots)
+            a, b = meilleure
+            fusion = a + b
             merges.append(meilleure)
 
-            # Affiche la progression tous les 200 pas
-            if (i + 1) % 200 == 0:
+            # Intersection pour trouver exactement les mots qui contiennent potentiellement la paire
+            mots_a_modifier = index[a] & index[b]
+
+            for mot in list(mots_a_modifier):
+                freq = vocab_mots[mot]
+
+                nouveau_mot = []
+                j = 0
+                modifie = False
+                while j < len(mot):
+                    if j < len(mot) - 1 and mot[j] == a and mot[j+1] == b:
+                        nouveau_mot.append(fusion)
+                        j += 2
+                        modifie = True
+                    else:
+                        nouveau_mot.append(mot[j])
+                        j += 1
+
+                if modifie:
+                    nouveau_mot = tuple(nouveau_mot)
+
+                    # 1. Soustraire les anciennes paires
+                    for k in range(len(mot) - 1):
+                        paires[(mot[k], mot[k+1])] -= freq
+
+                    # 2. Ajouter les nouvelles paires
+                    for k in range(len(nouveau_mot) - 1):
+                        paires[(nouveau_mot[k], nouveau_mot[k+1])] += freq
+
+                    # 3. Mettre à jour l'index
+                    for sym in set(mot):
+                        index[sym].remove(mot)
+                    for sym in set(nouveau_mot):
+                        index[sym].add(nouveau_mot)
+
+                    # 4. Mettre à jour vocab_mots
+                    del vocab_mots[mot]
+                    vocab_mots[nouveau_mot] = freq
+
+            # La paire courante n'existe plus (elle a été fusionnée)
+            if meilleure in paires:
+                del paires[meilleure]
+
+            # Affiche la progression tous les 500 pas (car c'est très rapide maintenant)
+            if (i + 1) % 500 == 0:
                 ecoul = time.time() - debut
                 reste = ecoul / (i + 1) * (n_fusions - i - 1)
                 token_fusionne = ''.join(meilleure)
                 print(f"    {i+1:4d}/{n_fusions}  {token_fusionne!r:25s}  "
-                      f"freq={freq_max:>7,}   {ecoul:.0f}s écoulé / ~{reste:.0f}s restant")
+                      f"freq={freq_max:>7,}   {ecoul:.1f}s écoulé / ~{reste:.1f}s restant")
 
         # ── 4. Construire le vocabulaire final ───────────────────
         print("\n  [4/4] Construction du vocabulaire final...")
@@ -198,30 +245,6 @@ class TokenizerBPE:
         print(f"\n  ✅ Entraînement terminé en {time.time()-debut:.1f}s")
         print(f"  Taille vocab final : {len(self.token_vers_id)} tokens")
         print(f"  Exemples de tokens : {exemples_bpe}")
-
-    def _fusionner(self, paire, vocab_mots):
-        """
-        Applique une fusion dans tout le vocabulaire de mots.
-        Exemple : paire=('t','h') → remplace ('t','h') par ('th',) partout.
-        """
-        a, b   = paire
-        fusion = a + b
-        nouveau_vocab = {}
-
-        for mot, freq in vocab_mots.items():
-            nouveau_mot = []
-            i = 0
-            while i < len(mot):
-                # Si on trouve la paire → fusion
-                if i < len(mot) - 1 and mot[i] == a and mot[i+1] == b:
-                    nouveau_mot.append(fusion)
-                    i += 2
-                else:
-                    nouveau_mot.append(mot[i])
-                    i += 1
-            nouveau_vocab[tuple(nouveau_mot)] = freq
-
-        return nouveau_vocab
 
     # ─────────────────────────────────────────────────────────────
     # ENCODAGE
@@ -361,97 +384,143 @@ class TokenizerBPE:
     def taille_vocab(self):
         return len(self.token_vers_id)
 
-# ================================================================
-# DÉTECTION DE CHANGEMENT DE DATASET (réentraînement automatique)
-# ================================================================
-CANDIDATS_DATA = [
-    "data/en/data.txt",
-    "data/fr/data.txt",
-    "data/multi/data.txt",
-    "data/data.txt",
-]
-
-def trouver_manifest():
-    """Retourne (chemin_manifest, langue) du premier manifest valide, ou (None, None)."""
+def trouver_sources_donnees():
+    """Recherche tous les manifests et tous les dossiers contenant des .txt dans data/"""
+    import glob
+    sources = []
+    
+    # 1. Manifests officiels
     for langue in ["fr", "en", "multi"]:
         manifest = os.path.join("data", langue, "manifest.json")
         if os.path.exists(manifest):
             try:
                 with open(manifest, 'r', encoding='utf-8') as f:
                     m = json.load(f)
-                if m.get("sources"):
-                    return manifest, langue
+                total_mo = m.get("total_mo", 0)
+                sources.append({
+                    "type": "manifest",
+                    "chemin": manifest,
+                    "langue": langue,
+                    "taille_mo": total_mo
+                })
             except Exception:
                 pass
-    return None, None
 
-def lire_depuis_manifest(manifest_path, max_chars=None):
-    """Lit et concatène les sources d'un manifest (avec limite optionnelle)."""
-    with open(manifest_path, 'r', encoding='utf-8') as f:
-        m = json.load(f)
-    langue      = m["langue"]
-    sources_dir = os.path.join("data", langue, "sources")
+    # 2. Dossiers dynamiques avec des .txt
+    txt_files = glob.glob(os.path.join("data", "**", "*.txt"), recursive=True)
+    dossiers = defaultdict(list)
+    for txt in txt_files:
+        dossiers[os.path.dirname(txt)].append(txt)
+        
+    for dossier, fichiers in dossiers.items():
+        # Optionnel: on peut masquer les dossiers "sources" des manifests pour éviter les doublons
+        # Mais pour plus de flexibilité, on les affiche.
+        taille_octets = sum(os.path.getsize(f) for f in fichiers)
+        taille_mo = taille_octets / 1_000_000
+        if taille_mo > 0.001:
+            sources.append({
+                "type": "dossier",
+                "chemin": dossier,
+                "fichiers": fichiers,
+                "taille_mo": taille_mo
+            })
+            
+    return sources
+
+def choisir_source_donnees(auto_select=False):
+    """Propose à l'utilisateur de choisir parmi les sources trouvées."""
+    sources = trouver_sources_donnees()
+    if not sources:
+        return None
+        
+    if len(sources) == 1 or auto_select:
+        return sources[0]
+        
+    print("\n" + "="*62)
+    print("  📚  SOURCES DE DONNÉES DÉTECTÉES")
+    print("="*62)
+    for i, src in enumerate(sources, 1):
+        if src["type"] == "manifest":
+            label = "🇫🇷/🇬🇧 Pack" if "multi" in src["chemin"] else "Pack"
+            print(f"  [{i}] {label:<15} : {src['chemin']} ({src['taille_mo']:.1f} Mo)")
+        else:
+            print(f"  [{i}] Dossier local   : {src['chemin']}/ ({len(src['fichiers'])} fichiers .txt) ({src['taille_mo']:.1f} Mo)")
+    print("="*62)
+    
+    choix = input("  Choix [1] > ").strip()
+    try:
+        idx = int(choix) - 1
+        if 0 <= idx < len(sources):
+            return sources[idx]
+    except Exception:
+        pass
+    return sources[0]
+
+def lire_source_donnees(source, max_chars=None):
+    """Lit le texte brut depuis la source sélectionnée."""
     texte = ""
-    for src in m.get("sources", []):
-        fichier = os.path.join(sources_dir, src["fichier"])
-        if not os.path.exists(fichier):
-            continue
-        with open(fichier, 'r', encoding='utf-8', errors='ignore') as f:
-            if max_chars:
-                reste = max_chars - len(texte)
-                if reste <= 0:
+    if source["type"] == "manifest":
+        with open(source["chemin"], 'r', encoding='utf-8') as f:
+            m = json.load(f)
+        sources_dir = os.path.join("data", m["langue"], "sources")
+        for src in m.get("sources", []):
+            fichier = os.path.join(sources_dir, src["fichier"])
+            if os.path.exists(fichier):
+                with open(fichier, 'r', encoding='utf-8', errors='ignore') as f:
+                    if max_chars:
+                        texte += f.read(max_chars - len(texte))
+                        if len(texte) >= max_chars: break
+                    else:
+                        texte += f.read()
+    elif source["type"] == "dossier":
+        fichiers = source["fichiers"]
+        # Pour le tokenizer, si on a une limite max_chars, on répartit la lecture sur tous les fichiers du dossier
+        if max_chars:
+            chars_par_fichier = max_chars // len(fichiers) + 1
+            for f_path in fichiers:
+                with open(f_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    texte += f.read(chars_par_fichier)
+                if len(texte) >= max_chars:
+                    texte = texte[:max_chars]
                     break
-                texte += f.read(reste)
-            else:
-                texte += f.read()
+        else:
+            for f_path in fichiers:
+                with open(f_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    texte += f.read()
     return texte
 
-def trouver_data_file(candidats=CANDIDATS_DATA):
-    """Retourne le premier fichier de données non-vide, ou None."""
-    for c in candidats:
-        if os.path.exists(c) and os.path.getsize(c) > 1024:
-            return c
-    return None
-
-def signature_dataset(data_file, sample_size=_SAMPLE_MIN, vocab_size=None):
-    """Empreinte du dataset réellement utilisé pour entraîner le BPE.
-
-    Le tokenizer n'apprend que sur les premiers `sample_size` octets : on hash
-    donc exactement cette tranche (+ nom du fichier, taille totale, vocab cible).
-    Si le dataset change, la signature change → réentraînement automatique.
-    """
-    if vocab_size is None:          # lu à l'exécution (évite le piège du défaut figé)
+def signature_dataset(source, vocab_size=None):
+    """Calcule une empreinte pour savoir si le dataset a changé."""
+    if vocab_size is None:
         vocab_size = VOCAB_SIZE
     h = hashlib.sha256()
-    h.update(os.path.basename(data_file).encode("utf-8"))
-    h.update(str(os.path.getsize(data_file)).encode("utf-8"))
     h.update(str(vocab_size).encode("utf-8"))
-    with open(data_file, "rb") as f:
-        h.update(f.read(sample_size))
+    
+    if source["type"] == "manifest":
+        h.update(source["chemin"].encode("utf-8"))
+        if os.path.exists(source["chemin"]):
+            h.update(str(os.path.getsize(source["chemin"])).encode("utf-8"))
+    else:
+        for f in sorted(source["fichiers"]):
+            h.update(f.encode("utf-8"))
+            if os.path.exists(f):
+                h.update(str(os.path.getsize(f)).encode("utf-8"))
     return h.hexdigest()
 
-def tokenizer_a_jour(chemin_tok=TOKENIZER_FILE, data_file=None):
-    """Indique si tokenizer.json existe ET correspond au dataset actuel.
-
-    Retourne (a_jour: bool, raison: str).
-    """
+def tokenizer_a_jour(chemin_tok=TOKENIZER_FILE, source=None):
+    """Indique si tokenizer.json existe ET correspond au dataset actuel."""
     if not os.path.exists(chemin_tok):
         return False, "tokenizer.json introuvable"
-    if data_file is None:
-        data_file = trouver_data_file()
-    if data_file is None:
-        # Pas de données pour vérifier : on conserve le tokenizer existant.
+    if source is None:
         return True, "aucune donnée pour vérifier — tokenizer conservé"
     try:
         with open(chemin_tok, "r", encoding="utf-8") as f:
             meta = json.load(f)
     except Exception:
         return False, "tokenizer.json illisible — réentraînement"
-    # Le hash encode déjà le fichier + sa taille + le vocab_size cible :
-    # tout changement de dataset OU de vocab cible modifie la signature.
-    if meta.get("dataset_sig") != signature_dataset(data_file):
-        ancien = meta.get("dataset_file", "?")
-        return False, f"dataset ou vocab modifié ({ancien} → {data_file})"
+        
+    if meta.get("dataset_sig") != signature_dataset(source):
+        return False, f"dataset ou vocab modifié"
     return True, "tokenizer à jour"
 
 # ================================================================
@@ -459,66 +528,31 @@ def tokenizer_a_jour(chemin_tok=TOKENIZER_FILE, data_file=None):
 # ================================================================
 if __name__ == "__main__":
 
-    # ── Mode manifest (nouvelle architecture) ────────────────────
-    manifest_path, manifest_langue = trouver_manifest()
+    # Le tokenizer sélectionne automatiquement la première source disponible
+    # pour créer un vocabulaire général.
+    source = choisir_source_donnees(auto_select=True)
 
-    if manifest_path:
-        print(f"  Manifest trouvé : {manifest_path}")
+    if not source:
+        print("❌ Aucun fichier de données trouvé !")
+        print("   Lance d'abord telecharger.py ou ajoute des .txt dans data/")
+        raise SystemExit(1)
 
-        # Vérification fraîcheur : le tokenizer existe-t-il et correspond-il ?
-        DATA_FILE_FOR_SIG = None
-        # Utilise le premier fichier source comme référence de signature
-        try:
-            with open(manifest_path, 'r', encoding='utf-8') as _f:
-                _m = json.load(_f)
-            _src0 = _m["sources"][0]["fichier"]
-            DATA_FILE_FOR_SIG = os.path.join("data", _m["langue"], "sources", _src0)
-        except Exception:
-            pass
+    print(f"  Source de tokenisation : {source['chemin']}")
 
-        a_jour, raison = tokenizer_a_jour(TOKENIZER_FILE, DATA_FILE_FOR_SIG)
-        if a_jour:
-            print(f"  ✅ Tokenizer déjà à jour ({raison}) — pas de réentraînement.")
-            raise SystemExit(0)
-        print(f"  ↻ Réentraînement du tokenizer : {raison}")
+    a_jour, raison = tokenizer_a_jour(TOKENIZER_FILE, source)
+    if a_jour:
+        print(f"  ✅ Tokenizer déjà à jour ({raison}) — pas de réentraînement.")
+        raise SystemExit(0)
+    print(f"  ↻ Réentraînement du tokenizer : {raison}")
 
-        print(f"Lecture depuis manifest ({manifest_langue})...")
-        echantillon = lire_depuis_manifest(manifest_path, max_chars=_SAMPLE_MAX)
-        print(f"  {len(echantillon)/1e6:.0f} Mo lus")
+    print(f"Lecture des données (max {_SAMPLE_MAX/1e6:.0f} Mo)...")
+    echantillon = lire_source_donnees(source, max_chars=_SAMPLE_MAX)
+    print(f"  {len(echantillon)/1e6:.1f} Mo lus")
 
-        sig = signature_dataset(DATA_FILE_FOR_SIG) if DATA_FILE_FOR_SIG else "manifest"
-        tok = TokenizerBPE()
-        tok.entrainer(echantillon, vocab_size=VOCAB_SIZE)
-        tok.sauvegarder(TOKENIZER_FILE, dataset_sig=sig, dataset_file=DATA_FILE_FOR_SIG)
-
-    else:
-        # ── Mode legacy : data.txt ────────────────────────────────
-        DATA_FILE = trouver_data_file()
-
-        if DATA_FILE is None:
-            print("❌ Aucun fichier de données trouvé !")
-            print("   Lance d'abord telecharger.py")
-            raise SystemExit(1)
-
-        a_jour, raison = tokenizer_a_jour(TOKENIZER_FILE, DATA_FILE)
-        if a_jour:
-            print(f"  ✅ Tokenizer déjà à jour ({raison}) — pas de réentraînement.")
-            raise SystemExit(0)
-        print(f"  ↻ Réentraînement du tokenizer : {raison}")
-
-        taille_octets = os.path.getsize(DATA_FILE)
-        taille_totale = taille_octets / 1_000_000
-        print(f"Données : {DATA_FILE} ({taille_totale:.0f} Mo)")
-
-        sample_size = int(max(_SAMPLE_MIN, min(_SAMPLE_MAX, taille_octets * _SAMPLE_RATIO)))
-        print(f"Lecture de {sample_size/1e6:.0f} Mo pour l'entraînement du tokenizer...")
-        with open(DATA_FILE, 'r', encoding='utf-8') as f:
-            echantillon = f.read(sample_size)
-
-        sig = signature_dataset(DATA_FILE)
-        tok = TokenizerBPE()
-        tok.entrainer(echantillon, vocab_size=VOCAB_SIZE)
-        tok.sauvegarder(TOKENIZER_FILE, dataset_sig=sig, dataset_file=DATA_FILE)
+    sig = signature_dataset(source)
+    tok = TokenizerBPE()
+    tok.entrainer(echantillon, vocab_size=VOCAB_SIZE)
+    tok.sauvegarder(TOKENIZER_FILE, dataset_sig=sig, dataset_file=source["chemin"])
 
     # ── Test de cohérence ────────────────────────────────────────
     print("\n" + "="*55)

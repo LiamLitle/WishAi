@@ -32,12 +32,21 @@ def bg_julia(script):
         return None
 
 def donnees_existent():
+    import glob
     def non_vide(p):
         return os.path.exists(p) and os.path.getsize(p) > 1024
-    for langue in ["en", "fr", "multi"]:
-        if non_vide(os.path.join(ROOT, "data", langue, "data.txt")):
+    
+    # Cherche n'importe quel manifest.json dans data/
+    for manifest in glob.glob(os.path.join(ROOT, "data", "*", "manifest.json")):
+        if non_vide(manifest):
             return True
-    return non_vide(os.path.join(ROOT, "data", "data.txt"))
+            
+    # Cherche n'importe quel fichier .txt dans data/ et ses sous-dossiers
+    for txt_file in glob.glob(os.path.join(ROOT, "data", "**", "*.txt"), recursive=True):
+        if non_vide(txt_file):
+            return True
+            
+    return False
 
 def lire_control():
     try:

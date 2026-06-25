@@ -22,7 +22,7 @@
 
 <br>
 
-![Version](https://img.shields.io/badge/Version-1.5.0-success)
+![Version](https://img.shields.io/badge/Version-1.5.2-success)
 [![License](https://img.shields.io/badge/License-Non--Commercial-red)](LICENSE)
 
 <br>
@@ -31,7 +31,7 @@
 
 **WishAI règle ça.**
 
-**🎉 Version 1.5.0 — Système de manifeste, vraies tailles de datasets, hot-reload pendant l'entraînement.**
+**🎉 Version 1.5.2 — Système de reprise d'entraînement, logs `TEMP/` avancés, architecture modulaire de config, et corrections d'export.**
 
 *Construit par Liam — from scratch.*
 
@@ -331,17 +331,26 @@ Le bouton **📚 Ouvrir la Bibliothèque** du dashboard ouvre `library.html` —
 <summary><b>📊 Comparaison avec les alternatives</b></summary>
 <br>
 
-| Fonctionnalité | 🧠 WishAI | nanoGPT / minGPT | LitGPT | GPT-NeoX | Axolotl | DeepSpeed |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Objectif** | Apprentissage + UI | Éducatif | Ingénierie | Échelle industrielle | Fine-tuning LoRA | Distribué multi-GPU |
-| **Dashboard temps réel** | ✅ Local | ❌ Terminal | ⚠️ Cloud payant | ❌ | ❌ W&B externe | ❌ W&B externe |
-| **Bibliothèque de datasets** | ✅ 135 curatés + 100k+ (HF/GitHub/PwC) | ❌ | ❌ | ❌ | ⚠️ Manuel | ❌ |
-| **Protection VRAM & OOM** | ✅ Auto + Accumulation | ❌ Crash | ✅ CLI | ❌ | ⚠️ Manuel | ⚠️ Manuel |
-| **Téléchargements en arrière-plan** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Early stopping** | ✅ Auto | ❌ Temps fixe | ❌ Manuel | ❌ | ⚠️ Config YAML | ❌ |
-| **Niveau requis** | Débutants | Développeurs | Ingénieurs ML | Labos de recherche | Praticiens ML | Chercheurs |
+| Fonctionnalité | 🧠 WishAI | nanoGPT | nanochat | LitGPT | GPT-NeoX | Axolotl | DeepSpeed |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Objectif** | Apprentissage + UI | Éducatif | Édu / Full-stack | Ingénierie | Échelle industrielle | Fine-tuning LoRA | Distribué multi-GPU |
+| **Dashboard temps réel** | ✅ Local | ❌ Terminal | ⚠️ Basic UI | ⚠️ Cloud payant | ❌ | ❌ W&B externe | ❌ W&B externe |
+| **Bibliothèque de datasets** | ✅ 135 curatés + 100k+ (HF/GitHub/PwC) | ❌ | ❌ | ❌ | ❌ | ⚠️ Manuel | ❌ |
+| **Protection VRAM & OOM** | ✅ Auto + Accumulation | ❌ Crash | ❌ Crash | ✅ CLI | ❌ | ⚠️ Manuel | ⚠️ Manuel |
+| **Téléchargements en arrière-plan** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Early stopping** | ✅ Auto | ❌ Temps fixe | ❌ Temps fixe | ❌ Manuel | ❌ | ⚠️ Config YAML | ❌ |
+| **Niveau requis** | Débutants | Développeurs | Développeurs | Ingénieurs ML | Labos de recherche | Praticiens ML | Chercheurs |
+| **Multi-GPU / Cluster** | ❌ Solo (1 GPU) | ✅ Basique (DDP) | ❌ Solo | ✅ FSDP/DDP | ✅ Megatron | ✅ FSDP | ✅ Natif |
+| **LoRA / Fine-tuning** | ❌ Entraînement 0 | ⚠️ Basique | ✅ Oui | ✅ Oui | ❌ | ✅ QLoRA | ✅ Oui |
+| **API Prod / Serving** | ❌ Usage local | ❌ | ⚠️ API Minime | ✅ vLLM/LitServe | ❌ | ❌ | ✅ Oui |
+| **Quantification (4/8-bit)** | ❌ FP16/BF16 | ❌ FP16/BF16 | ❌ FP16/BF16 | ✅ Oui | ❌ | ✅ Oui | ✅ Oui |
+| **Exportation (GGUF/ONNX)** | ❌ PyTorch unique | ⚠️ Scripts persos | ❌ | ✅ Oui | ❌ | ✅ Oui | ❌ |
+| **Poids pré-entraînés** | ❌ Entraînement de 0 | ✅ GPT-2 | ❌ | ✅ Nombreux | ✅ EleutherAI | ✅ Tout HuggingFace | ⚠️ Selon framework |
+| **Architectures Custom** | ❌ Fixe (Style LLaMA) | ✅ Code modifiable | ✅ Code modifiable | ✅ Modulaire | ✅ Modulaire | ❌ Config YAML | ✅ Flexible |
 
-**nanoGPT / minGPT** — parfaits pour comprendre les maths d'un Transformer. Pas d'interface, aucune protection VRAM ni d'accumulation de gradients par défaut, pas d'early stopping.
+**[nanoGPT](https://github.com/karpathy/nanoGPT)** — parfait pour comprendre les maths d'un Transformer. Pas d'interface, aucune protection VRAM ni d'accumulation de gradients par défaut, pas d'early stopping. **WishAI** s'inspire grandement de son moteur.
+
+**[nanochat](https://github.com/karpathy/nanochat)** — "le meilleur ChatGPT pour 100$" (par Andrej Karpathy, 2025/2026). Couvre tout le pipeline (pré-entraînement, finetuning, UI). Génial pour avoir la stack complète la plus minimale possible, mais manque de protections matérielles et de datasets automatiques par rapport à WishAI.
 
 **LitGPT** — optimisations de pointe, pensé CLI. Pour un dashboard il faut leur cloud payant.
 

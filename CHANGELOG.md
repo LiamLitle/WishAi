@@ -8,7 +8,75 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Tim
 
 ---
 
-## [1.5.0] — 2026-06-24 18h13
+## [1.5.2] — 2026-06-25 12h10.pm
+
+Major update improving training reliability, logging, and internal architecture.
+
+### New Features & Training
+
+- **Training Recovery System**: The AI now robustly saves its state, allowing users to resume a training session exactly where it stopped (useful after a crash, manual interruption, or human error).
+- **Advanced Logging & Temporary Storage**: Created a dedicated `TEMP/` subdirectory with precise timestamps (exact date, hours, seconds) for a granular training history without polluting the main directory.
+- **Enriched `log_active.json`**: Added critical real-time system information:
+  - AMP (Automatic Mixed Precision) and `torch.compile()` activation status.
+  - Real model parameter count.
+  - BPE and Tokenization status, including data download percentages and specific files/folders used.
+- **Dynamic Model Detection**: Improved the dashboard's active model detection (no longer blindly relies on `active.json`).
+
+### Interface & Visualization
+
+- **Word Cloud User Experience (UX)**: The 4,000 token point cloud has been strictly flattened into 2D (Z-axis fixed to 0) and 3D rotation has been disabled, making the interface significantly more legible.
+
+### Configuration Refactor & Bugfixes
+
+- **Modular configuration architecture**: `scripts/config.py` has been refactored. Instead of one giant file, the codebase is now cleanly separated into a `scripts/Config/` directory (`donnees.py`, `modeles.py`, `systeme.py`, `utilitaires.py`).
+- **"Shadowing" bug fix (`token.py`)**: The `scripts/token.py` script created an internal namespace conflict with standard Python packages, which randomly reset the tokenizer during model exports. It has been renamed to `scripts/reset_token.py`.
+- **ONNX/GGUF export optimization**: Model exports are now neatly generated directly inside each model's directory (`model/<model_name>/`) along with an automatic copy of the `tokenizer.json` file, rather than prompting the user to copy the entire folder to the Desktop.
+- **Export loading fix**: `export.py` was modified to correctly handle dynamic model loading from training checkpoints (weight dictionaries + `log_active.json` for config) instead of assuming the full PyTorch object was saved in the `.pt` file, fixing the `AttributeError: 'dict' object has no attribute 'eval'` crash.
+
+---
+
+## [1.5.1] — 2026-06-25 9h18.am
+
+### Julia Analytic Engine — Advanced Convergence Predictions
+
+- **`src/estimations.jl`** — new Julia background process running alongside the Python training loop. Performs two analyses Python cannot do efficiently:
+  - **Chinchilla overfitting risk** — computes the parameter-to-token ratio and classifies risk as `faible` (low), `modéré` (moderate), `élevé` (high), or `critique` (critical) according to the Chinchilla scaling law (target ratio ≥ 20 tokens per parameter).
+  - **Exponential plateau prediction** — fits a `L(s) = a + b·exp(-c·s)` curve via `LsqFit.jl` to estimate the asymptotic loss the model will converge to and how many steps remain before reaching it. Confidence level reported (`haute`, `bonne`, `faible`).
+- **File-based IPC** — Julia reads `model/{name}/log_active.json` (written by Python) and outputs `model/{name}/insights.json`. The two processes never lock each other.
+- **Automatic Julia installation** — `src/require.py` calls `check_and_install_julia()` at startup. On Windows, silently installs Julia via `winget install --id Julialang.Juliaup -e --silent` if not found. On other platforms, prints a manual install prompt. Packages `LsqFit` and `JSON` are installed/verified with `Pkg.add([...])`.
+- **Graceful degradation** — if Julia is absent or packages are not yet installed, `go.py` skips the Julia process without crashing. The dashboard displays `"waiting for Julia..."` instead of an error.
+
+### Adaptive Learning Rate (Cosine Decay)
+
+- **`get_lr(iteration)`** in `nanogpt_bpe.py` — replaces the previous fixed learning rate with a two-phase schedule:
+  - **Warmup** (first 100 steps): LR ramps linearly from `lr/100` to `learning_rate`.
+  - **Cosine decay** (remaining steps): LR follows a cosine curve from `learning_rate` down to `learning_rate × 0.1`. This is the same schedule used by GPT-3, LLaMA, and Mistral.
+- Current LR is logged to `log_active.json` as `lr_actuel` at every evaluation step.
+
+### Best Model Checkpointing
+
+- `nanogpt_bpe.py` now saves `best_model.pt` (alongside `checkpoint.pt`) whenever `val_loss` reaches a new all-time low. If training overshoots or overfits, the best weights are always preserved.
+
+### Dashboard — Julia Metrics Integration
+
+- **Learning Rate card** — new card in the main metrics row showing the current LR value with a label indicating whether it is in warmup phase or cosine decay.
+- **Plateau prediction (Julia)** — the "Plateau estimé" cell in the Trends section now displays Julia's exponential curve fit result (`~2.87` target loss, `~800 steps remaining`, confidence level) instead of the previous linear JavaScript estimate.
+- **Chinchilla Overfitting cell** — new cell in the Trends section showing the risk level (`FAIBLE` / `MODÉRÉ` / `ÉLEVÉ` / `CRITIQUE`) with color coding (green / yellow / red) and the raw ratio.
+- **`fetchLog()`** updated to also fetch `insights.json` and merge it into the dashboard data object after each polling cycle.
+
+### Tests
+
+- **`tests/test_all.py`** — automated test suite covering all v1.5.1 features:
+  - Julia binary detection
+  - `LsqFit` + `JSON` package verification (auto-installs if missing)
+  - Synthetic training curve → Julia generates `insights.json` → results validated
+  - Cosine decay scheduler: warmup ascent, cosine descent, and final value assertions
+  - **Auto-cleanup**: saves and restores any existing `active.json`; deletes all test artifacts after the run.
+
+---
+
+## [1.5.0] — 2026-06-24 18h13.pm
+
 
 ### Download bot — real sizes & custom sources
 
@@ -33,7 +101,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Tim
 
 ---
 
-## [1.4.0] — 2026-06-24 9h22
+## [1.4.0] — 2026-06-24 9h22.am
 
 ### Auto-bot & data download
 
@@ -66,7 +134,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Tim
 
 ---
 
-## [1.3.3] — 2026-06-24 8h26
+## [1.3.3] — 2026-06-24 8h26.am
 
 ### Launcher system
 
@@ -83,7 +151,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Tim
 
 ---
 
-## [1.3.2] — 2026-06-24 07:54
+## [1.3.2] — 2026-06-24 07:54.am
 
 ### Project structure
 
@@ -99,7 +167,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Tim
 
 ---
 
-## [1.3.1] — 2026-06-23 20:07
+## [1.3.1] — 2026-06-23 20:07.pm
 
 ### Embedding visualizer improvements
 
@@ -111,7 +179,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Tim
 
 ---
 
-## [1.3.0] — 2026-06-23 19:34
+## [1.3.0] — 2026-06-23 19:34.pm
 
 ### Chat interface — complete redesign
 
@@ -142,7 +210,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Tim
 
 ---
 
-## [1.2.0] — 2026-06-21 18:28
+## [1.2.0] — 2026-06-21 18:28.pm
 
 ### Dashboard — complete UI
 
@@ -178,7 +246,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Tim
 
 ---
 
-## [1.1.0] — 2026-06-21 18:20
+## [1.1.0] — 2026-06-21 18:20.pm
 
 ### Architecture
 
@@ -208,7 +276,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Tim
 
 ---
 
-## [1.0.0] — 2026-06-21 18:20
+## [1.0.0] — 2026-06-21 18:20.pm
 
 First stable version. Code review, bug fixes and safety net (tests).
 

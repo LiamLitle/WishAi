@@ -23,7 +23,7 @@
 
 <br>
 
-![Version](https://img.shields.io/badge/Version-1.5.0-success)
+![Version](https://img.shields.io/badge/Version-1.5.2-success)
 [![License](https://img.shields.io/badge/License-Non--Commercial-red)](LICENSE)
 
 <br>
@@ -32,7 +32,7 @@
 
 **WishAI fixes that.**
 
-**🎉 Version 1.5.0 — Manifest system, real dataset sizes, hot-reload during training.**
+**🎉 Version 1.5.2 — Training recovery system, advanced `TEMP/` logging, modular config architecture, and export bug fixes.**
 
 *Built by Liam — learned from scratch.*
 
@@ -332,17 +332,26 @@ The **📚 Open Library** button in the dashboard opens `library.html` — the f
 <summary><b>📊 Comparison with alternatives</b></summary>
 <br>
 
-| Feature | 🧠 WishAI | nanoGPT / minGPT | LitGPT | GPT-NeoX | Axolotl | DeepSpeed |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Goal** | Learning + UI | Educational | Engineering | Industrial scale | LoRA fine-tuning | Multi-GPU distributed |
-| **Real-time dashboard** | ✅ Local | ❌ Terminal | ⚠️ Paid cloud | ❌ | ❌ External W&B | ❌ External W&B |
-| **Dataset library** | ✅ 135 curated + 100k+ (HF/GitHub/PwC) | ❌ | ❌ | ❌ | ⚠️ Manual | ❌ |
-| **VRAM & OOM protection** | ✅ Auto + Accumulation | ❌ Crash | ✅ CLI | ❌ | ⚠️ Manual | ⚠️ Manual |
-| **Background downloads** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Early stopping** | ✅ Auto | ❌ Fixed time | ❌ Manual | ❌ | ⚠️ YAML config | ❌ |
-| **Required level** | Beginners | Developers | ML Engineers | Research labs | ML practitioners | Researchers |
+| Feature | 🧠 WishAI | nanoGPT | nanochat | LitGPT | GPT-NeoX | Axolotl | DeepSpeed |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Goal** | Learning + UI | Educational | Edu / Full-stack | Engineering | Industrial scale | LoRA fine-tuning | Distributed Multi-GPU |
+| **Real-time dashboard** | ✅ Local | ❌ Terminal | ⚠️ Basic UI | ⚠️ Paid cloud | ❌ | ❌ External W&B | ❌ External W&B |
+| **Dataset library** | ✅ 135 curated + 100k+ (HF/GitHub/PwC) | ❌ | ❌ | ❌ | ❌ | ⚠️ Manual | ❌ |
+| **VRAM & OOM protection** | ✅ Auto + Accumulation | ❌ Crash | ❌ Crash | ✅ CLI | ❌ | ⚠️ Manual | ⚠️ Manual |
+| **Background downloads** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Early stopping** | ✅ Auto | ❌ Fixed time | ❌ Fixed time | ❌ Manual | ❌ | ⚠️ YAML config | ❌ |
+| **Required level** | Beginners | Developers | Developers | ML Engineers | Research labs | ML practitioners | Researchers |
+| **Multi-GPU / Cluster** | ❌ Single GPU only | ✅ Basic (DDP) | ❌ Single node | ✅ FSDP/DDP | ✅ Megatron | ✅ FSDP | ✅ Native |
+| **LoRA / Fine-tuning** | ❌ Pretrain only | ⚠️ Basic | ✅ Yes | ✅ Yes | ❌ | ✅ QLoRA | ✅ Yes |
+| **Production API / Serving** | ❌ Local use only | ❌ | ⚠️ Minimal API | ✅ vLLM/LitServe | ❌ | ❌ | ✅ Yes |
+| **Quantization (4/8-bit)** | ❌ FP16/BF16 only | ❌ FP16/BF16 | ❌ FP16/BF16 | ✅ Yes | ❌ | ✅ Yes | ✅ Yes |
+| **Model Export (GGUF/ONNX)** | ❌ PyTorch only | ⚠️ Custom scripts | ❌ | ✅ Yes | ❌ | ✅ Yes | ❌ |
+| **Pre-trained Weights** | ❌ Trains from scratch | ✅ GPT-2 | ❌ | ✅ Many | ✅ EleutherAI | ✅ All HuggingFace | ⚠️ Framework dependent |
+| **Custom Architectures** | ❌ Fixed (LLaMA-style) | ✅ Hackable code | ✅ Hackable code | ✅ Modular | ✅ Modular | ❌ YAML Config | ✅ Flexible |
 
-**nanoGPT / minGPT** — great for understanding Transformer math. No interface, no VRAM protection or gradient accumulation by default, no early stopping.
+**[nanoGPT](https://github.com/karpathy/nanoGPT)** — great for understanding Transformer math. No interface, no VRAM protection or gradient accumulation by default, no early stopping. **WishAI** is heavily inspired by its core engine.
+
+**[nanochat](https://github.com/karpathy/nanochat)** — "the best ChatGPT that $100 can buy" (by Andrej Karpathy, 2025/2026). Covers the full pipeline (pretraining, finetuning, UI). Great for a complete minimal stack, but lacks automatic hardware protection and automatic datasets compared to WishAI.
 
 **LitGPT** — cutting-edge optimizations, CLI-focused. For a dashboard you need their paid cloud.
 

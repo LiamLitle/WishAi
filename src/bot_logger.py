@@ -147,6 +147,9 @@ PAQUETS_IMPORT = {
     "psutil":         "psutil",
     "requests":       "requests",
     "numpy":          "numpy",
+    "gguf":           "gguf",
+    "onnx":           "onnx",
+    "onnxscript":     "onnxscript",
 }
 
 

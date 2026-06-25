@@ -7,6 +7,11 @@ requests
 datasets
 huggingface_hub
 
+# Exportation
+gguf
+onnx
+onnxscript
+
 # Options (surveillance GPU)
 gputil
 pynvml

@@ -22,7 +22,9 @@ data/**/*.txt
 data/**/*.bin
 data/cc_temp/
 
-# ── Historique UI ───────────────────────────────────────────────
+# ── Historique UI et Logs ───────────────────────────────────────────────
+system/logs/
+TEMP/
 historique_data.json
 
 # ── Python ──────────────────────────────────────────────────────

@@ -1,0 +1,39 @@
+#!/bin/bash
+ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+PYTHON_CMD="python"
+if [ -f "$ROOT/.venv/bin/python" ]; then
+    PYTHON_CMD="$ROOT/.venv/bin/python"
+elif [ -f "$ROOT/.venv/Scripts/python.exe" ]; then
+    # Cas rare ou bash tourne sous Windows (Git Bash/WSL)
+    PYTHON_CMD="$ROOT/.venv/Scripts/python.exe"
+fi
+
+case "$1" in
+    go)     $PYTHON_CMD "$ROOT/go.py" "${@:2}" ;;
+    chat)   $PYTHON_CMD "$ROOT/scripts/chat.py" "${@:2}" ;;
+    quick)  $PYTHON_CMD "$ROOT/scripts/quick.py" "${@:2}" ;;
+    config) $PYTHON_CMD "$ROOT/scripts/config.py" "${@:2}" ;;
+    serve)  $PYTHON_CMD "$ROOT/scripts/serve.py" "${@:2}" ;;
+    visual) $PYTHON_CMD -m http.server 8080 --directory "$ROOT" ;;
+    token)  $PYTHON_CMD "$ROOT/scripts/reset_token.py" "${@:2}" ;;
+    repair) $PYTHON_CMD "$ROOT/src/bot_logger.py" "${@:2}" ;;
+    logs)   $PYTHON_CMD "$ROOT/scripts/logs.py" "${@:2}" ;;
+    export) $PYTHON_CMD "$ROOT/scripts/export.py" "${@:2}" ;;
+    *)
+        echo ""
+        echo "  WishAI — Raccourcis"
+        echo "  -------------------"
+        echo "  ./wish go        Lance le menu principal"
+        echo "  ./wish chat      Interface de chat"
+        echo "  ./wish quick     Entrainement rapide (zero config)"
+        echo "  ./wish config    Gestion des modeles et donnees"
+        echo "  ./wish export    Exporter un modele (GGUF / ONNX)"
+        echo "  ./wish serve     Serveur local (dashboard / library)"
+        echo "  ./wish visual    Visualiseur d'embeddings (port 8080)"
+        echo "  ./wish token     Reinitialise et reentrainer le tokenizer BPE"
+        echo "  ./wish repair    Verifie et repare les dependances cassees"
+        echo "  ./wish logs      Affiche les derniers logs du bot"
+        echo ""
+        ;;
+esac

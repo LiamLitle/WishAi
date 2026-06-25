@@ -16,6 +16,8 @@ PAQUETS_BASE = {
     "requests"       : "requests",
     "datasets"       : "datasets",
     "huggingface_hub": "huggingface_hub",
+    "gguf"           : "gguf",
+    "onnx"           : "onnx",
 }
 
 TORCH_PKGS = "torch torchvision torchaudio"

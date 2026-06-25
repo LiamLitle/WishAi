@@ -73,7 +73,10 @@ import psutil
 import subprocess as _sp
 import signal as _sig
 
-from tokenizer import TokenizerBPE, TOKENIZER_FILE, VOCAB_SIZE as _VOCAB_SIZE
+from tokenizer import (
+    TokenizerBPE, TOKENIZER_FILE, VOCAB_SIZE as _VOCAB_SIZE,
+    choisir_source_donnees, lire_source_donnees
+)
 from model import WishAI_BPE, ConfigModele
 
 # ================================================================
@@ -427,29 +430,63 @@ def check_securite():
     return True
 
 # ================================================================
-#  FONCTIONS UTILITAIRES DE SAISIE
+#  SYSTÈME DE SESSION DE CONFIGURATION
 # ================================================================
 
-def demander(question, defaut, type_=str, mini=None, maxi=None):
-    """
-    Pose une question à l'utilisateur avec une valeur par défaut.
-    Appuyer sur Entrée sans rien taper → valeur par défaut utilisée.
-    """
+_TEMP_DIR = os.path.join(_ROOT, "TEMP")
+os.makedirs(_TEMP_DIR, exist_ok=True)
+_SESSION_FILE = os.path.join(_TEMP_DIR, "config_resume.json")
+_session_state = {}
+
+def _sauvegarder_session():
+    import datetime
+    try:
+        # On ajoute un timestamp lisible sans écraser les vraies clés de configuration
+        copie_state = _session_state.copy()
+        copie_state["_timestamp"] = datetime.datetime.now().strftime("%d/%m/%Y à %H:%M:%S")
+        with open(_SESSION_FILE, "w", encoding="utf-8") as f:
+            json.dump(copie_state, f, indent=2)
+    except Exception:
+        pass
+
+def input_session(question, cle):
+    """Pose une question ou récupère la réponse de la session."""
+    if cle in _session_state:
+        val = _session_state[cle]
+        print(f"  {question} > {val}  [repris]")
+        return val
+    
+    rep = input(f"  {question} > ").strip()
+    _session_state[cle] = rep
+    _sauvegarder_session()
+    return rep
+
+def demander_session(question, defaut, cle, type_=str, mini=None, maxi=None):
+    """Demande avec défaut, ou récupère depuis la session."""
+    if cle in _session_state:
+        val = _session_state[cle]
+        print(f"  {question} [{defaut}] > {val}  [repris]")
+        return type_(val)
+        
     valeur_str = input(f"  {question} [{defaut}] > ").strip()
     if not valeur_str:
-        return defaut
-    try:
-        valeur = type_(valeur_str)
-        if mini is not None and valeur < mini:
-            print(f"  ⚠️  Minimum = {mini} → valeur ajustée")
-            return type_(mini)
-        if maxi is not None and valeur > maxi:
-            print(f"  ⚠️  Maximum = {maxi} → valeur ajustée")
-            return type_(maxi)
-        return valeur
-    except (ValueError, TypeError):
-        print(f"  ⚠️  Valeur invalide → {defaut} conservé")
-        return defaut
+        valeur = defaut
+    else:
+        try:
+            valeur = type_(valeur_str)
+            if mini is not None and valeur < mini:
+                print(f"  ⚠️  Minimum = {mini} → valeur ajustée")
+                valeur = type_(mini)
+            if maxi is not None and valeur > maxi:
+                print(f"  ⚠️  Maximum = {maxi} → valeur ajustée")
+                valeur = type_(maxi)
+        except (ValueError, TypeError):
+            print(f"  ⚠️  Valeur invalide → {defaut} conservé")
+            valeur = defaut
+            
+    _session_state[cle] = valeur
+    _sauvegarder_session()
+    return valeur
 
 # ================================================================
 #  ASSISTANT DE CONFIGURATION GUIDÉ
@@ -461,6 +498,26 @@ def configurer():
     Guide l'utilisateur à travers toute la configuration.
     Retourne un dict avec tous les paramètres d'entraînement.
     """
+    global _session_state
+
+    # Vérification d'une session de configuration existante
+    if os.path.exists(_SESSION_FILE):
+        try:
+            with open(_SESSION_FILE, "r", encoding="utf-8") as f:
+                saved_state = json.load(f)
+            if saved_state:
+                timestamp = saved_state.get("_timestamp", "")
+                msg_timestamp = f" (sauvegardée le {timestamp})" if timestamp else ""
+                print("\n" + "="*62)
+                print("  💾  REPRISE DE CONFIGURATION")
+                print("="*62)
+                rep = input(f"  Une configuration inachevée{msg_timestamp} a été trouvée. Reprendre ? [O/n] > ").strip().lower()
+                if rep not in ["n", "non"]:
+                    _session_state = saved_state
+                else:
+                    os.remove(_SESSION_FILE)
+        except Exception:
+            pass
 
     # ────────────────────────────────────────────────────────────
     #  DÉTECTION DU PC
@@ -478,7 +535,7 @@ def configurer():
     print("  Ce nom sera utilisé pour les fichiers sauvegardés.")
     print("  Exemples : MonIA, GPT_v1, swift2, Jarvis, Zephyr...")
     print()
-    nom_saisi  = input("  Nom > ").strip()
+    nom_saisi = input_session("Nom", "nom_saisi")
     if not nom_saisi:
         nom_saisi = "monIA"
     # Retire les caractères spéciaux pour un nom de fichier propre
@@ -504,12 +561,7 @@ def configurer():
     print("  Appuie sur Entrée pour utiliser la config recommandée.")
 
     idx_defaut = noms_presets.index(preset_recommande) + 1
-    choix_str  = input(f"  Choix [{idx_defaut}] > ").strip()
-
-    try:
-        choix_num = int(choix_str) if choix_str else idx_defaut
-    except ValueError:
-        choix_num = idx_defaut
+    choix_num = demander_session("Choix", idx_defaut, "choix_preset", type_=int, mini=1, maxi=6)
 
     checkpoint_interval = None  # sera défini dans ÉTAPE 3 ou dans le mode Simple custom
 
@@ -555,7 +607,7 @@ def configurer():
             return int(float(s))
 
         while True:
-            cible_str = input("  Params cibles [40M] > ").strip()
+            cible_str = input_session("Params cibles [40M]", "cible_str")
             if not cible_str:
                 cible_str = "40M"
             try:
@@ -623,7 +675,7 @@ def configurer():
         print("  [1] Simple  — utiliser cette config directement")
         print("  [2] Expert  — modifier les paramètres un par un")
         print()
-        mode_c = input("  Choix [1] > ").strip()
+        mode_c = input_session("Choix [1]", "mode_c")
 
         if mode_c == "2":
             # ── Expert : valeurs calculées pré-remplies, recommandations dynamiques ──
@@ -642,7 +694,7 @@ def configurer():
             print("  ─── BATCH SIZE PHYSIQUE (VRAM) ───────────────────────────────────")
             print("  Nombre d'exemples traités en parallèle — limité par ta VRAM.")
             print("  4 = sûr pour presque toutes les configs (1-2 Go VRAM).")
-            batch_size = demander("Batch size", bs_c, int, mini=1, maxi=512)
+            batch_size = demander_session("Batch size", bs_c, "batch_size", int, mini=1, maxi=512)
             _batch_rec_ga = max(1, 32 // batch_size)
             _conseil(f"Pour batch_size={batch_size}, vise accumulation={_batch_rec_ga} → batch effectif {batch_size * _batch_rec_ga}.")
 
@@ -650,7 +702,7 @@ def configurer():
             print("\n  ─── ACCUMULATION DE GRADIENTS ────────────────────────────────")
             print("  Simule un plus grand batch sans consommer plus de VRAM.")
             print(f"  Recommandé : {_batch_rec_ga} (pour atteindre batch effectif ~32).")
-            grad_accum_steps = demander("Accumulation", ga_c, int, mini=1, maxi=128)
+            grad_accum_steps = demander_session("Accumulation", ga_c, "grad_accum_steps", int, mini=1, maxi=128)
             _eff = batch_size * grad_accum_steps
             if _eff < 8:
                 _conseil(f"Batch effectif {_eff} est faible — apprentissage potentiellement instable. Monte l'accumulation.")
@@ -662,7 +714,7 @@ def configurer():
             # ── BLOCK SIZE ──────────────────────────────────────────────────────
             print("\n  ─── LONGUEUR DU CONTEXTE (block_size) ──────────────────────────")
             print("  128 ≈ 90 mots  |  256 ≈ 180 mots  |  512 ≈ 360 mots")
-            block_size = demander("Block size", bl_c, int, mini=32, maxi=1024)
+            block_size = demander_session("Block size", bl_c, "block_size", int, mini=32, maxi=1024)
             _bl_words = block_size * 0.7
             if block_size > 512 and params_reel < 20_000_000:
                 _conseil(f"Block size {block_size} est grand pour un modèle {params_label} — préfère 256 pour éviter le surapprentissage.")
@@ -674,7 +726,7 @@ def configurer():
             # ── N_EMBD ──────────────────────────────────────────────────────────
             print("\n  ─── TAILLE INTERNE (n_embd) ─────────────────────────────────────")
             print(f"  Calculé automatiquement : {n_embd_calc}. Doit être multiple de 64.")
-            n_embd = demander("N_embd", n_embd_calc, int, mini=64, maxi=2048)
+            n_embd = demander_session("N_embd", n_embd_calc, "n_embd", int, mini=64, maxi=2048)
             if n_embd % 64 != 0:
                 _conseil(f"{n_embd} n'est pas multiple de 64 — moins efficace sur GPU. Essaie {(n_embd//64)*64} ou {(n_embd//64+1)*64}.")
             else:
@@ -689,10 +741,10 @@ def configurer():
             print(f"  Valides pour n_embd={n_embd} : {diviseurs_valides}")
             print(f"  Head size cible ≈ 64 (stable) — recommandé : {diviseurs_valides[-1]} (head size = {n_embd // diviseurs_valides[-1]}).")
             n_head_def = n_head_calc if n_embd % n_head_calc == 0 else diviseurs_valides[-1]
-            n_head = demander("N_head", n_head_def, int, mini=1, maxi=32)
+            n_head = demander_session("N_head", n_head_def, "n_head", int, mini=1, maxi=32)
             while n_embd % n_head != 0:
                 print(f"  ⚠️  {n_head} ne divise pas {n_embd} — valides : {diviseurs_valides}")
-                n_head = demander("N_head (corriger)", diviseurs_valides[-1], int, mini=1, maxi=32)
+                n_head = demander_session("N_head (corriger)", diviseurs_valides[-1], "n_head", int, mini=1, maxi=32)
             _hs = n_embd // n_head
             if _hs < 32:
                 _conseil(f"Head size {_hs} est petit — peut limiter la capacité d'attention. Essaie {diviseurs_valides[max(0,len(diviseurs_valides)-2)]} têtes.")
@@ -704,7 +756,7 @@ def configurer():
             # ── N_LAYER ─────────────────────────────────────────────────────────
             print("\n  ─── PROFONDEUR (n_layer) ──────────────────────────────────────────")
             print("  4 (rapide) · 6 · 8 · 12 (MEDIUM) · 16 (puissant)")
-            n_layer = demander("N_layer", n_layer_calc, int, mini=1, maxi=48)
+            n_layer = demander_session("N_layer", n_layer_calc, "n_layer", int, mini=1, maxi=48)
             _p_final = _params_reels(n_embd, n_layer)
             _delta2 = (_p_final - cible) / cible * 100
             _sign2 = "+" if _delta2 >= 0 else ""
@@ -717,7 +769,7 @@ def configurer():
             print("  0.0 → aucune régularisation · 0.2 → équilibré · 0.4 → original")
             _do_rec = 0.1 if _p_final < 10_000_000 else 0.2 if _p_final < 60_000_000 else 0.25
             print(f"  Pour {_p_final/1e6:.1f}M params, recommandé : {_do_rec}")
-            dropout = demander("Dropout", do_c, float, mini=0.0, maxi=0.5)
+            dropout = demander_session("Dropout", do_c, "dropout", float, mini=0.0, maxi=0.5)
             if dropout > 0.35 and _p_final < 20_000_000:
                 _conseil(f"Dropout {dropout} est élevé pour un petit modèle — risque de sous-apprentissage. Essaie {_do_rec}.")
             elif dropout == 0.0:
@@ -728,7 +780,7 @@ def configurer():
             _lr_rec = 3e-4 if _p_final < 60_000_000 else 1e-4
             print(f"  Recommandé pour {_p_final/1e6:.1f}M params : {_lr_rec:.0e}")
             print("  Trop grand → instable (loss explose). Trop petit → très lent.")
-            learning_rate = demander("Learning rate", lr_c, float, mini=1e-6, maxi=1e-2)
+            learning_rate = demander_session("Learning rate", lr_c, "learning_rate", float, mini=1e-6, maxi=1e-2)
             if learning_rate > 5e-4 and _p_final > 50_000_000:
                 _conseil(f"{learning_rate:.0e} est élevé pour un grand modèle — risque d'instabilité. Essaie {_lr_rec:.0e}.")
             elif learning_rate < 1e-5:
@@ -751,13 +803,13 @@ def configurer():
             print("  0.0 → texte cohérent et prévisible")
             print("  0.2 → bon équilibre  ← recommandé")
             print("  0.4 → texte plus original, moins répétitif")
-            dropout = demander("Originalité", do_c, float, mini=0.0, maxi=0.5)
+            dropout = demander_session("Originalité", do_c, "dropout", float, mini=0.0, maxi=0.5)
 
             print("\n  ─── SAUVEGARDE AUTOMATIQUE (checkpoint) ────────────────────────")
             print("  Toutes les  100 étapes → très fréquent")
             print("  Toutes les  500 étapes → bon équilibre  ← recommandé")
             print("  Toutes les 1000 étapes → moins fréquent")
-            checkpoint_interval = demander("Sauvegarder toutes les N étapes", 500, int, mini=10, maxi=10000)
+            checkpoint_interval = demander_session("Sauvegarder toutes les N étapes", 500, "checkpoint_interval", int, mini=10, maxi=10000)
             print(f"\n  ✅ Config : {n_embd} embd / {n_head} heads / {n_layer} layers — {params_label} — originalité {dropout} — checkpoint /{checkpoint_interval}")
 
     # ────────────────────────────────────────────────────────────
@@ -775,8 +827,8 @@ def configurer():
         print("  Toutes les  500 étapes → bon équilibre  ← recommandé")
         print("  Toutes les 1000 étapes → moins fréquent (risque de perdre + de travail)")
         print()
-        checkpoint_interval = demander(
-            "Sauvegarder toutes les N étapes", 500, int, mini=10, maxi=10000
+        checkpoint_interval = demander_session(
+            "Sauvegarder toutes les N étapes", 500, "checkpoint_interval", int, mini=10, maxi=10000
         )
         print(f"  → Checkpoint toutes les {checkpoint_interval} étapes")
 
@@ -793,12 +845,12 @@ def configurer():
     print("  ─── EVAL INTERVAL ────────────────────────────────────────")
     print("  Tous les combien d'étapes calcule-t-on la val_loss ?")
     print("  Évaluer trop souvent ralentit l'entraînement (mais c'est plus précis).")
-    eval_interval = demander("Évaluer toutes les N étapes", 500, int, mini=50, maxi=5000)
+    eval_interval = demander_session("Évaluer toutes les N étapes", 500, "eval_interval", int, mini=50, maxi=5000)
 
     print("\n  ─── EVAL ITERS ───────────────────────────────────────────")
     print("  Combien de batches utiliser pour calculer la val_loss ?")
     print("  ↑ = mesure plus précise, mais légèrement plus lente")
-    eval_iters = demander("Batches pour l'évaluation", 100, int, mini=10, maxi=500)
+    eval_iters = demander_session("Batches pour l'évaluation", 100, "eval_iters", int, mini=10, maxi=500)
 
     # ────────────────────────────────────────────────────────────
     #  RÉCAPITULATIF
@@ -818,6 +870,11 @@ def configurer():
     print(f"  Limite VRAM      : {LIMITE_VRAM_GO} Go  (arrêt auto au-dessus)")
     print(f"  Limite RAM       : {LIMITE_RAM_GO} Go  (arrêt auto au-dessus)")
     print("="*62)
+
+    # Configuration terminée, on peut supprimer la session
+    _session_state.clear()
+    try: os.remove(_SESSION_FILE)
+    except Exception: pass
 
     return {
         "nom_modele"         : nom_modele,
@@ -920,118 +977,23 @@ taille_vocab = tok.taille_vocab
 print(f"  ✅ Vocab BPE : {taille_vocab} tokens chargés")
 print("     (vs ~100 tokens en char-level — contexte 3× plus riche !)")
 
-# ================================================================
-#  SÉLECTION ET CHARGEMENT DES DONNÉES
-# ================================================================
-DATA_FILE     = os.path.join(_ROOT, 'data', 'data.txt')
-DATA_MANIFEST = None   # chemin du manifest.json si mode manifest
-DATA_LANG     = None   # langue du dataset sélectionné
-FLAG          = {
-    "fr"   : "🇫🇷 Français",
-    "en"   : "🇬🇧 Anglais",
-    "multi": "🌍 Multilingue",
-}
-
-def _lire_depuis_manifest(manifest_path):
-    """Concatène toutes les sources listées dans manifest.json."""
-    with open(manifest_path, 'r', encoding='utf-8') as f:
-        manifest = json.load(f)
-    langue      = manifest["langue"]
-    sources_dir = os.path.join(_ROOT, "data", langue, "sources")
-    texte = ""
-    for src in manifest.get("sources", []):
-        fichier = os.path.join(sources_dir, src["fichier"])
-        if os.path.exists(fichier):
-            mo = src.get("mo", "?")
-            print(f"     Lecture : {src['fichier']} ({mo} Mo)")
-            with open(fichier, 'r', encoding='utf-8', errors='ignore') as f:
-                texte += f.read()
-    return texte
+DATA_SOURCE   = None
+DATA_LANG     = None
 
 def choisir_donnees():
-    """
-    Cherche manifests puis data.txt disponibles, demande lequel utiliser si plusieurs.
-    Priorité : manifest.json > data.txt (manifest = pas de doublon de stockage).
-    """
-    global DATA_FILE, DATA_MANIFEST, DATA_LANG
-
-    # ── Manifests disponibles ──────────────────────────────────────
-    manifests_dispo = []
-    for langue in ["fr", "en", "multi"]:
-        manifest = os.path.join(_ROOT, "data", langue, "manifest.json")
-        if os.path.exists(manifest):
-            try:
-                with open(manifest, 'r', encoding='utf-8') as f:
-                    m = json.load(f)
-                total_mo = m.get("total_mo", 0)
-                manifests_dispo.append((langue, manifest, total_mo))
-            except Exception:
-                pass
-
-    # ── data.txt legacy ───────────────────────────────────────────
-    legacy_dispo = []
-    for langue in ["fr", "en", "multi"]:
-        chemin = os.path.join(_ROOT, "data", langue, "data.txt")
-        if os.path.exists(chemin) and os.path.getsize(chemin) > 1024:
-            taille = os.path.getsize(chemin) / 1_000_000
-            legacy_dispo.append((langue, chemin, taille))
-
-    if not manifests_dispo and not legacy_dispo:
-        if os.path.exists(DATA_FILE) and os.path.getsize(DATA_FILE) > 1024:
-            print(f"  Données : {DATA_FILE} ({os.path.getsize(DATA_FILE)/1e6:.1f} Mo)")
-            return
-        print("\n❌ Aucun fichier de données trouvé !")
-        print("   Lance d'abord : python telecharger.py")
+    """Détecte et propose les données via tokenizer.py."""
+    global DATA_SOURCE, DATA_LANG
+    DATA_SOURCE = choisir_source_donnees(auto_select=_QUICK_MODE)
+    if not DATA_SOURCE:
+        print("\n❌ Aucun fichier de données trouvé dans data/")
+        print("   Lance d'abord : python telecharger.py ou ajoute des fichiers .txt")
         raise SystemExit(1)
-
-    toutes = ([(l, m, s, "manifest") for l, m, s in manifests_dispo] +
-              [(l, c, s, "txt")      for l, c, s in legacy_dispo])
-
-    if len(toutes) == 1:
-        langue, chemin, taille, typ = toutes[0]
-        if typ == "manifest":
-            DATA_MANIFEST = chemin
-            DATA_LANG     = langue
-            DATA_FILE     = None
-            print(f"  Données : {FLAG.get(langue, langue)} — manifest ({taille:.1f} Mo total)")
-        else:
-            DATA_FILE = chemin
-            DATA_LANG = langue
-            print(f"  Données : {FLAG.get(langue, langue)} — {chemin} ({taille:.1f} Mo)")
-        return
-
-    print("\n" + "="*62)
-    print("  📚  PLUSIEURS JEUX DE DONNÉES DISPONIBLES")
-    print("="*62)
-    for i, (langue, chemin, taille, typ) in enumerate(toutes, 1):
-        label = "manifest" if typ == "manifest" else "data.txt"
-        print(f"  [{i}]  {FLAG.get(langue, langue):<24} {taille:.1f} Mo  ({label})")
-    print("="*62)
-
-    if _QUICK_MODE:
-        toutes.sort(key=lambda x: x[2], reverse=True)
-        langue, chemin, taille, typ = toutes[0]
+        
+    if DATA_SOURCE["type"] == "manifest":
+        DATA_LANG = DATA_SOURCE["langue"]
     else:
-        choix = input("  Choix > ").strip()
-        try:
-            idx = int(choix) - 1
-            if 0 <= idx < len(toutes):
-                langue, chemin, taille, typ = toutes[idx]
-            else:
-                raise ValueError
-        except (ValueError, IndexError):
-            langue, chemin, taille, typ = toutes[0]
-            print(f"  → {FLAG.get(langue, langue)} sélectionné par défaut")
-
-    if typ == "manifest":
-        DATA_MANIFEST = chemin
-        DATA_LANG     = langue
-        DATA_FILE     = None
-        print(f"  → {FLAG.get(langue, langue)} — manifest ({taille:.1f} Mo)")
-    else:
-        DATA_FILE = chemin
-        DATA_LANG = langue
-        print(f"  → {FLAG.get(langue, langue)} — {chemin} ({taille:.1f} Mo)")
+        DATA_LANG = "custom"
+    print(f"  → Source sélectionnée : {DATA_SOURCE['chemin']}")
 
 print("\n" + "="*62)
 print("  📚  DONNÉES D'ENTRAÎNEMENT")
@@ -1039,44 +1001,39 @@ print("="*62)
 choisir_donnees()
 
 # ── Encodage BPE + cache ─────────────────────────────────────────
-#
-#  L'encodage BPE peut prendre 5-10 minutes la première fois.
-#  Ensuite, le résultat est mis en cache (bpe_cache.pt) :
-#  les lancements suivants sont instantanés.
-#
-if DATA_MANIFEST:
-    _data_dir  = os.path.dirname(DATA_MANIFEST)
-else:
-    _data_dir  = os.path.dirname(DATA_FILE) if DATA_FILE else "."
+_data_dir  = os.path.dirname(DATA_SOURCE["chemin"])
 CACHE_FILE = os.path.join(_data_dir, "bpe_cache.pt")
-RELOAD_FLAG = os.path.join(_ROOT, "data", DATA_LANG, "reload_requested.flag") if DATA_LANG else None
+RELOAD_FLAG = os.path.join(_ROOT, "data", DATA_LANG, "reload_requested.flag") if DATA_LANG != "custom" else None
 
 def _cache_valide():
     """Cache valide ssi il existe ET est plus récent que tokenizer.json et les sources."""
     if not os.path.exists(CACHE_FILE):
         return False
-    tok_file = os.path.join(_ROOT, "data", "tokenizer.json")
-    if os.path.exists(tok_file):
-        if os.path.getmtime(tok_file) > os.path.getmtime(CACHE_FILE):
-            return False
-    # Si manifest : vérifier si une source est plus récente que le cache
-    if DATA_MANIFEST and os.path.exists(DATA_MANIFEST):
+    tok_file = os.path.join(_ROOT, "system", "tokenizer.json")
+    if os.path.exists(tok_file) and os.path.getmtime(tok_file) > os.path.getmtime(CACHE_FILE):
+        return False
+        
+    if DATA_SOURCE["type"] == "manifest":
         try:
-            with open(DATA_MANIFEST, 'r', encoding='utf-8') as f:
+            with open(DATA_SOURCE["chemin"], 'r', encoding='utf-8') as f:
                 m = json.load(f)
             sources_dir = os.path.join(_ROOT, "data", m["langue"], "sources")
             for src in m.get("sources", []):
                 fp = os.path.join(sources_dir, src["fichier"])
                 if os.path.exists(fp) and os.path.getmtime(fp) > os.path.getmtime(CACHE_FILE):
-                    return False  # nouvelle source → cache périmé
+                    return False
         except Exception:
             pass
+    else:
+        for fp in DATA_SOURCE["fichiers"]:
+            if os.path.exists(fp) and os.path.getmtime(fp) > os.path.getmtime(CACHE_FILE):
+                return False
     return True
 
 def recharger_donnees():
-    """Re-tokenise depuis le manifest (appelé en hot-reload)."""
-    print("\n  ♻️  Rechargement des données depuis manifest...")
-    texte     = _lire_depuis_manifest(DATA_MANIFEST)
+    """Re-tokenise depuis la source (appelé en hot-reload)."""
+    print("\n  ♻️  Rechargement des données...")
+    texte     = lire_source_donnees(DATA_SOURCE)
     ids_liste = tok.encoder_dataset(texte)
     del texte
     gc.collect()
@@ -1098,19 +1055,32 @@ else:
         except Exception: pass
     print("  ⏳ Encodage BPE en cours...")
     print("     (première fois uniquement — résultat mis en cache)")
-    if DATA_MANIFEST:
-        texte = _lire_depuis_manifest(DATA_MANIFEST)
-    else:
-        with open(DATA_FILE, 'r', encoding='utf-8') as f:
-            texte = f.read()
-    ids_liste = tok.encoder_dataset(texte)
-    del texte
-    gc.collect()
-    data = torch.tensor(ids_liste, dtype=torch.int32)
-    del ids_liste
-    gc.collect()
-    torch.save(data, CACHE_FILE)
-    print(f"  ✅ {len(data):,} tokens encodés et mis en cache → {CACHE_FILE}")
+    try:
+        texte = lire_source_donnees(DATA_SOURCE)
+        ids_liste = tok.encoder_dataset(texte)
+        del texte
+        gc.collect()
+        data = torch.tensor(ids_liste, dtype=torch.int32)
+        del ids_liste
+        gc.collect()
+        torch.save(data, CACHE_FILE)
+        print(f"  ✅ {len(data):,} tokens encodés et mis en cache → {CACHE_FILE}")
+        
+        # Log de succès
+        import datetime
+        with open(os.path.join(_ROOT, "TEMP", "historique_entrainements.log"), "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}] ENCODAGE BPE RÉUSSI\n")
+            f.write(f"  Fichier/Dossier : {DATA_SOURCE}\n")
+            f.write(f"  Résultat        : {len(data):,} tokens générés\n\n")
+            
+    except Exception as e:
+        import datetime
+        with open(os.path.join(_ROOT, "TEMP", "historique_entrainements.log"), "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}] ERREUR ENCODAGE BPE\n")
+            f.write(f"  Fichier/Dossier : {DATA_SOURCE}\n")
+            f.write(f"  Détail erreur   : {e}\n\n")
+        raise e
+        
     # libère le cache interne du tokenizer — inutile pendant l'entraînement
     tok._cache.clear()
     gc.collect()
@@ -1196,13 +1166,16 @@ scaler = torch.amp.GradScaler("cuda", enabled=(_amp_on and _amp_dtype == torch.f
 
 # ── Compilation (PyTorch 2.x) — activée seulement sur Linux+CUDA ──
 # (instable / non supportée sur Windows et MPS → on saute proprement)
+_compile_status = "Non (ignoré)"
 try:
     if hasattr(torch, "compile") and device == "cuda" and sys.platform.startswith("linux"):
         modele = torch.compile(modele)
+        _compile_status = "Oui"
         print("  torch.compile : activé")
     else:
         print("  torch.compile : ignoré (Linux+CUDA uniquement)")
 except Exception as _e:
+    _compile_status = f"Erreur ({_e})"
     print(f"  torch.compile : indisponible ({_e}) — on continue sans")
 
 # Module brut sous-jacent : pour sauvegarder/charger les poids SANS le préfixe
@@ -1479,6 +1452,27 @@ _dernier_log = time.time()
 with open(LOG_FILE, "w", encoding="utf-8") as f:
     json.dump(log_data, f, ensure_ascii=False)
 
+def _log_historique_temp():
+    import datetime
+    hist_file = os.path.join(_TEMP_DIR, "historique_entrainements.log")
+    try:
+        with open(hist_file, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}] DÉBUT ENTRAÎNEMENT\n")
+            f.write(f"  Modèle       : {nom_modele} ({cfg.get('preset', 'CUSTOM')})\n")
+            f.write(f"  Source (BPE) : {DATA_SOURCE} (tokens: {len(train_data):,})\n")
+            f.write(f"  Architecture : {n_layer} couches × {n_head} têtes × {n_embd} dim\n")
+            f.write(f"  Paramètres   : {nb_params:,} ({nb_params/1e6:.1f}M)\n")
+            f.write(f"  Contexte     : {block_size} tokens\n")
+            gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"
+            f.write(f"  Device       : {device.upper()} ({gpu_name})\n")
+            f.write(f"  AMP activé   : {'Oui' if _amp_on else 'Non'}\n")
+            f.write(f"  Compile      : {_compile_status}\n")
+            f.write(f"  Mode / Temps : {log_data.get('mode', 'auto')}\n")
+            f.write("-" * 60 + "\n")
+    except Exception:
+        pass
+_log_historique_temp()
+
 # ── Early stopping ───────────────────────────────────────────────
 _meilleur_val = float('inf')
 _patience     = 5       # nb d'évaluations sans amélioration avant d'arrêter
@@ -1574,12 +1568,12 @@ for iteration in range(new_start_iter, max_iters):
         try:
             import numpy as _np
             _w = _modele_brut().token_embedding.weight.detach().cpu().float().numpy()
-            # PCA 3D rapide (< 5ms pour 4000×64)
+            # PCA 2D rapide (< 5ms pour 4000×64)
             _X   = _w - _w.mean(axis=0)
             _cov = _np.cov(_X.T)
             _val, _vec = _np.linalg.eigh(_cov)
-            _top3 = _np.argsort(_val)[::-1][:3]
-            _proj = (_X @ _vec[:, _top3]).tolist()
+            _top2 = _np.argsort(_val)[::-1][:2]
+            _proj = (_X @ _vec[:, _top2]).tolist()
             _vocab = [tok.id_vers_token.get(i, f"<{i}>") for i in range(len(_proj))]
             _emb_json = {
                 "step"      : iteration,
@@ -1590,7 +1584,6 @@ for iteration in range(new_start_iter, max_iters):
                 "tokens"    : _vocab,
                 "x"         : [round(p[0], 5) for p in _proj],
                 "y"         : [round(p[1], 5) for p in _proj],
-                "z"         : [round(p[2], 5) for p in _proj],
             }
             with open(os.path.join(MODEL_DIR, "embeddings.json"), "w", encoding="utf-8") as _ef:
                 json.dump(_emb_json, _ef, ensure_ascii=False)
@@ -1645,7 +1638,7 @@ for iteration in range(new_start_iter, max_iters):
             print(f"  ⚠️  Checkpoint échoué : {_e}")
 
         # Rechargement à chaud si nouvelles sources ajoutées
-        if DATA_MANIFEST and RELOAD_FLAG and os.path.exists(RELOAD_FLAG):
+        if RELOAD_FLAG and os.path.exists(RELOAD_FLAG):
             print(f"\n  ♻️  Nouvelles données détectées (étape {iteration}) — "
                   "ré-tokenisation en cours...")
             os.remove(RELOAD_FLAG)
@@ -1758,4 +1751,7 @@ print(f"  Modele : {nb_params/1e6:.1f}M params  |  "
       f".pt {_taille_pt:.1f} Mo  |  .safetensors {_taille_st:.1f} Mo")
 if _val_finale:
     print(f"  Val Loss finale : {_val_finale:.4f}")
+print("\n  💡 Info : Tu peux exporter ce modele (GGUF / ONNX) avec la commande :")
+print(f"     ./wish export {nom_modele}")
 print("="*62)
+
