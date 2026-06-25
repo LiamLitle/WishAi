@@ -1,0 +1,213 @@
+/* WishAI Embedding Visualizer */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background: #06090f;
+    overflow: hidden;
+    font-family: 'Consolas', 'Courier New', monospace;
+    color: #8a9ab0;
+    width: 100vw;
+    height: 100vh;
+}
+
+#canvas {
+    display: block;
+    cursor: crosshair;
+}
+
+/* ── Topbar ──────────────────────────────────────────────────── */
+#ui {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 10;
+    pointer-events: none;
+}
+
+#topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    background: rgba(6, 9, 15, 0.90);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    pointer-events: all;
+    backdrop-filter: blur(6px);
+}
+
+#title {
+    font-size: 12px;
+    font-weight: bold;
+    color: #c0cce0;
+    white-space: nowrap;
+    letter-spacing: 0.4px;
+    flex-shrink: 0;
+}
+
+.sep { color: #222a38; font-size: 16px; flex-shrink: 0; }
+
+#info-step, #info-loss, #info-count {
+    font-size: 11px;
+    color: #3a4a60;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ── Filtres ─────────────────────────────────────────────────── */
+#filters {
+    display: flex;
+    gap: 4px;
+    margin-left: 6px;
+    flex-shrink: 0;
+}
+
+.filter-btn {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 5px;
+    color: #4a6080;
+    font-family: inherit;
+    font-size: 11px;
+    padding: 3px 9px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+.filter-btn:hover {
+    background: rgba(255,255,255,0.07);
+    color: #8aa0c0;
+}
+.filter-btn.active {
+    background: rgba(255,255,255,0.10);
+    border-color: rgba(255,255,255,0.22);
+    color: #c8d8f0;
+}
+
+/* ── Recherche ───────────────────────────────────────────────── */
+#search {
+    margin-left: auto;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 5px;
+    color: #a0b8d0;
+    font-family: inherit;
+    font-size: 11px;
+    padding: 4px 10px;
+    width: 160px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+#search:focus { border-color: rgba(255,255,255,0.25); }
+#search::placeholder { color: #2a3a50; }
+
+/* ── Boutons icônes ──────────────────────────────────────────── */
+#btn-reload, #btn-reset-drag, #file-label {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 5px;
+    color: #4a6080;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 4px 9px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    pointer-events: all;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+#btn-reload:hover, #btn-reset-drag:hover, #file-label:hover {
+    background: rgba(255,255,255,0.09);
+    color: #8aa0c0;
+}
+#file-input { display: none; }
+
+/* ── Légende ─────────────────────────────────────────────────── */
+#legend {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    background: rgba(6, 9, 15, 0.80);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 7px;
+    padding: 9px 12px;
+    font-size: 11px;
+    line-height: 2;
+    pointer-events: none;
+    z-index: 10;
+    color: #4a6080;
+}
+.dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-right: 7px;
+    vertical-align: middle;
+}
+
+/* ── Tooltip ─────────────────────────────────────────────────── */
+#tooltip {
+    position: fixed;
+    background: rgba(8, 12, 20, 0.95);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 12px;
+    color: #d0e0f0;
+    pointer-events: none;
+    display: none;
+    z-index: 20;
+    white-space: nowrap;
+    max-width: 280px;
+    align-items: center;
+    gap: 8px;
+}
+.tip-id  { color: #3a5070; font-size: 11px; }
+.tip-cat {
+    font-size: 10px;
+    color: #2a4050;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 3px;
+    padding: 1px 5px;
+}
+
+/* ── Hint ────────────────────────────────────────────────────── */
+#hint {
+    position: fixed;
+    bottom: 16px; right: 16px;
+    font-size: 10px;
+    color: #1e2a3a;
+    text-align: right;
+    line-height: 1.9;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* ── No-data ─────────────────────────────────────────────────── */
+#nodata {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 5;
+    pointer-events: none;
+}
+#nodata.hidden { display: none; }
+#nodata p {
+    color: #2a3a50;
+    font-size: 13px;
+    text-align: center;
+    max-width: 360px;
+    line-height: 1.7;
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at center, transparent 30%, rgba(0,0,0,0.6) 150%);
+    z-index: 1;
+}

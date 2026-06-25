@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WishAI — Chat</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Fond glow bords -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- PANEL CONVERSATIONS -->
+<div class="conv-overlay" id="conv-overlay" onclick="closeConvPanel()"></div>
+<aside class="conv-panel" id="conv-panel">
+  <div class="conv-panel-head">
+    <span class="conv-panel-title">Historique</span>
+    <div style="display:flex;gap:4px;align-items:center">
+      <button class="icon-btn" onclick="newConv()" title="Nouvelle conversation">+</button>
+      <button class="conv-panel-close" onclick="closeConvPanel()" title="Fermer">✕</button>
+    </div>
+  </div>
+  <div class="conv-list" id="conv-list"></div>
+</aside>
+
+<!-- Bouton sidebar flottant -->
+<button class="sidebar-toggle" onclick="toggleConvPanel()" title="Conversations">&#9776;</button>
+
+<!-- APP -->
+<div class="app" id="app">
+
+  <!-- Zone messages (cachée tant que pas de chat) -->
+  <div class="messages" id="messages"></div>
+
+  <!-- Écran d'accueil + input flottant (centré) -->
+  <div class="welcome-wrap" id="welcome-wrap">
+    <div class="welcome" id="welcome">
+      <p class="welcome-title" id="welcome-title">WishAI</p>
+      <p class="welcome-hint">Charge un modèle, puis commence à écrire.</p>
+    </div>
+    <!-- Input unique — bougera en bas au 1er message -->
+    <div class="input-zone" id="input-zone">
+      <div class="input-box" id="input-box">
+        <textarea id="input" class="input-ta"
+                  placeholder="Envoie un message…"
+                  rows="1"
+                  onkeydown="onKey(event)"
+                  oninput="autoResize(this)"></textarea>
+        <button class="send-btn" id="send-btn" onclick="send()" disabled>&#8593;</button>
+      </div>
+      <div class="input-footer">
+        <div class="model-inline-row">
+          <select id="model-select-inline" class="model-select-inline" onchange="onModelSelectChange()"></select>
+          <button class="load-inline-btn" id="load-inline-btn" onclick="loadModel()">Charger</button>
+          <span class="model-status" id="model-status"></span>
+        </div>
+        <button class="more-opts-btn" id="more-opts-btn" onclick="toggleMoreOpts()">⚙ Plus d'options</button>
+      </div>
+      <div class="more-opts-panel" id="more-opts-panel">
+        <label class="setting-lbl">
+          <span>Temp</span>
+          <input type="range" class="mini-slider" id="temp-s" min="0.1" max="2" step="0.1" value="0.8"
+                 oninput="document.getElementById('tv').textContent=parseFloat(this.value).toFixed(1)">
+          <span id="tv">0.8</span>
+        </label>
+        <label class="setting-lbl">
+          <span>Long.</span>
+          <input type="range" class="mini-slider" id="len-s" min="20" max="500" step="10" value="200"
+                 oninput="document.getElementById('lv').textContent=this.value">
+          <span id="lv">200</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WishAI — Visualisation des Embeddings</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+<div id="ui">
+  <div id="topbar">
+    <span id="title">WishAI · Embeddings</span>
+    <span class="sep">|</span>
+    <span id="info-step">Étape : —</span>
+    <span class="sep">·</span>
+    <span id="info-loss">val_loss : —</span>
+    <span class="sep">·</span>
+    <span id="info-count">— tokens</span>
+
+    <div id="filters">
+      <button class="filter-btn active" data-filter="all">Tous</button>
+      <button class="filter-btn" data-filter="words">🔤 Mots</button>
+      <button class="filter-btn" data-filter="numbers">🔢 Chiffres</button>
+      <button class="filter-btn" data-filter="special">⚡ Spéciaux</button>
+      <button class="filter-btn" data-filter="endword">&lt;/w&gt; Fins</button>
+      <button class="filter-btn" data-lines="toggle">🔗 Fils</button>
+      <button class="filter-btn active" data-action="separate">⛶ Séparer</button>
+    </div>
+
+    <input id="search" type="text" placeholder="🔍 Chercher…" autocomplete="off" spellcheck="false">
+    <button id="btn-reset-drag">↺ Reset</button>
+    <button id="btn-reload">↺</button>
+    <label id="file-label" for="file-input">📂</label>
+    <input id="file-input" type="file" accept=".json">
+  </div>
+</div>
+
+<div id="canvas-container" style="position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: auto;"></div>
+
+<div id="tooltip"></div>
+
+<div id="legend">
+  <div><span class="dot" style="background:#4db8cc;"></span>Mots</div>
+  <div><span class="dot" style="background:#c8a830;"></span>Chiffres</div>
+  <div><span class="dot" style="background:#c04060;"></span>Spéciaux</div>
+  <div><span class="dot" style="background:#e07820;"></span>Recherche</div>
+</div>
+
+<div id="hint">
+  Molette → zoom · Glisser → déplacer<br>
+  Survol → nom · Double-clic → recentrer
+</div>
+
+<div id="nodata">
+  <p>Aucun embedding chargé.<br>
+     Lance <b>python go.py</b> puis clique sur <b>↺</b>,<br>
+     ou ouvre un fichier <b>embeddings.json</b>.</p>
+</div>
+
+<script src="visual.js"></script>
+</body>
+</html>

@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📚 Bibliothèque de Données — WishAI</title>
+<style>
+:root {
+  --bg0:#0d1117;--bg1:#161b22;--bg2:#21262d;--bg3:#30363d;
+  --text:#e6edf3;--muted:#8b949e;--dim:#484f58;
+  --blue:#58a6ff;--purple:#bc8cff;--green:#3fb950;
+  --yellow:#e3b341;--red:#f85149;--border:rgba(255,255,255,0.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg0);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow-y:scroll;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 60% 50% at 10% 20%,rgba(88,166,255,0.05) 0%,transparent 60%),
+             radial-gradient(ellipse 50% 60% at 90% 80%,rgba(188,140,255,0.05) 0%,transparent 60%);}
+
+/* TOPBAR */
+.topbar{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:16px;
+  padding:0 28px;height:60px;background:rgba(13,17,23,0.9);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);}
+.topbar-logo{font-size:1.1rem;font-weight:700;
+  background:linear-gradient(90deg,var(--blue),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;flex-shrink:0;}
+.topbar-sep{width:1px;height:22px;background:var(--bg3);flex-shrink:0;}
+
+/* Source pills */
+.source-pills{display:flex;gap:6px;flex-wrap:nowrap;}
+.pill{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;
+  font-size:0.83rem;font-weight:600;cursor:pointer;transition:all 0.2s;
+  background:transparent;border:1px solid var(--bg3);color:var(--muted);}
+.pill:hover{color:var(--text);border-color:var(--dim);}
+.pill.active-hf{color:#FFD21E;background:rgba(255,210,30,0.1);border-color:rgba(255,210,30,0.3);}
+.pill.active-gh{color:#e6edf3;background:rgba(230,237,243,0.08);border-color:rgba(230,237,243,0.25);}
+.pill.active-pw{color:var(--purple);background:rgba(188,140,255,0.1);border-color:rgba(188,140,255,0.3);}
+.pill.active-sel{color:var(--green);background:rgba(63,185,80,0.1);border-color:rgba(63,185,80,0.3);}
+
+.topbar-back{margin-left:auto;display:flex;align-items:center;gap:8px;padding:6px 14px;
+  background:var(--bg2);border:1px solid var(--bg3);border-radius:8px;
+  color:var(--muted);font-size:0.82rem;text-decoration:none;transition:all 0.2s;flex-shrink:0;}
+.topbar-back:hover{background:var(--bg3);color:var(--text);}
+
+/* LAYOUT */
+.page-layout{display:flex;flex-direction:column;min-height:calc(100vh - 60px);
+  position:relative;z-index:1;padding:24px 32px;max-width:1400px;margin:0 auto;}
+
+/* SEARCH BAR */
+.search-row{display:flex;gap:10px;align-items:center;margin-bottom:20px;}
+.search-wrap{position:relative;flex:1;}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);
+  color:var(--dim);font-size:1rem;pointer-events:none;}
+#search-input{width:100%;padding:12px 16px 12px 44px;
+  background:var(--bg1);border:1px solid var(--border);
+  border-radius:10px;color:var(--text);font-size:0.95rem;outline:none;transition:border-color 0.2s;}
+#search-input:focus{border-color:var(--blue);}
+#search-input::placeholder{color:var(--dim);}
+.filter-selects{display:flex;gap:8px;}
+.custom-select{padding:11px 28px 11px 12px;
+  background:var(--bg1) url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22%238b949e%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M7%2010l5%205%205-5z%22%2F%3E%3C%2Fsvg%3E") no-repeat right 8px center;
+  border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.85rem;
+  appearance:none;cursor:pointer;outline:none;min-width:130px;transition:border-color 0.2s;}
+.custom-select:focus{border-color:var(--blue);}
+.sort-select{display:none;}
+.sort-select.visible{display:block;}
+
+/* SUGGESTIONS */
+.sugg-row{display:none;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:16px;}
+.sugg-row.visible{display:flex;}
+.sugg-label{font-size:0.78rem;color:var(--muted);font-weight:500;}
+.sugg-btn{background:var(--bg2);border:1px solid var(--bg3);color:var(--muted);
+  padding:4px 12px;border-radius:12px;font-size:0.78rem;cursor:pointer;transition:all 0.2s;}
+.sugg-btn:hover{background:rgba(88,166,255,0.1);border-color:rgba(88,166,255,0.3);color:var(--blue);}
+
+/* RESULTS HEADER */
+.results-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.results-title{font-size:1.05rem;font-weight:600;display:flex;align-items:center;gap:10px;}
+.results-count{font-size:0.75rem;background:var(--bg2);color:var(--muted);padding:3px 10px;border-radius:20px;}
+.loading-indicator{display:none;font-size:0.85rem;color:var(--yellow);align-items:center;gap:6px;}
+.loading-indicator.visible{display:flex;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:14px;height:14px;border:2px solid rgba(227,179,65,0.3);border-top-color:var(--yellow);border-radius:50%;animation:spin 0.7s linear infinite;}
+
+/* SOURCE BADGE on cards */
+.src-badge{display:inline-flex;align-items:center;gap:4px;font-size:0.68rem;font-weight:700;
+  padding:2px 8px;border-radius:10px;letter-spacing:0.02em;}
+.src-badge.sel{background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3);color:var(--green);}
+.src-badge.hf{background:rgba(255,210,30,0.1);border:1px solid rgba(255,210,30,0.3);color:#FFD21E;}
+.src-badge.gh{background:rgba(230,237,243,0.07);border:1px solid rgba(230,237,243,0.2);color:var(--muted);}
+.src-badge.pw{background:rgba(188,140,255,0.1);border:1px solid rgba(188,140,255,0.3);color:var(--purple);}
+
+/* GRID & CARDS */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;}
+.ds-card{background:var(--bg1);border:1px solid var(--border);
+  border-radius:12px;padding:20px;transition:all 0.2s ease;
+  display:flex;flex-direction:column;gap:12px;}
+.ds-card:hover{border-color:rgba(88,166,255,0.3);transform:translateY(-3px);
+  box-shadow:0 10px 24px rgba(0,0,0,0.25);}
+.ds-card-header{display:flex;align-items:flex-start;gap:12px;}
+.ds-icon{font-size:1.5rem;width:42px;height:42px;display:flex;align-items:center;justify-content:center;
+  background:var(--bg2);border-radius:10px;flex-shrink:0;}
+.ds-info h3{font-size:0.93rem;font-weight:600;margin-bottom:3px;line-height:1.3;word-break:break-all;}
+.ds-desc{font-size:0.79rem;color:var(--muted);line-height:1.45;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}
+.ds-tags{display:flex;flex-wrap:wrap;gap:5px;}
+.tag{font-size:0.7rem;padding:3px 8px;border-radius:6px;font-weight:500;display:inline-flex;align-items:center;gap:3px;}
+.tag-lang{background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.2);color:var(--blue);}
+.tag-dom{background:rgba(188,140,255,0.1);border:1px solid rgba(188,140,255,0.2);color:var(--purple);}
+.tag-stat{background:var(--bg2);border:1px solid var(--bg3);color:var(--dim);}
+.tag-gated{background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.2);color:var(--red);}
+.ds-actions{display:flex;gap:8px;align-items:center;margin-top:auto;padding-top:12px;border-top:1px solid var(--border);}
+.size-wrap{display:flex;align-items:center;background:var(--bg2);border:1px solid var(--bg3);
+  border-radius:8px;overflow:hidden;flex:1;transition:border-color 0.2s;}
+.size-wrap:focus-within{border-color:var(--blue);}
+.size-wrap input{flex:1;background:transparent;border:none;outline:none;
+  color:var(--text);font-size:0.85rem;padding:8px 10px;min-width:0;font-family:inherit;}
+.size-wrap span{padding:8px 10px 8px 0;font-size:0.8rem;color:var(--muted);}
+.dl-btn{display:flex;align-items:center;gap:6px;padding:8px 16px;
+  background:rgba(88,166,255,0.12);border:1px solid rgba(88,166,255,0.25);
+  border-radius:8px;color:var(--blue);font-size:0.85rem;font-weight:600;
+  cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.dl-btn:hover:not(:disabled){background:rgba(88,166,255,0.25);border-color:var(--blue);}
+.dl-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.dl-btn.downloading{background:rgba(227,179,65,0.15);border-color:rgba(227,179,65,0.4);color:var(--yellow);}
+.dl-btn.done{background:rgba(63,185,80,0.15);border-color:rgba(63,185,80,0.4);color:var(--green);}
+.dl-btn.error{background:rgba(248,81,73,0.15);border-color:rgba(248,81,73,0.3);color:var(--red);}
+.link-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;
+  background:transparent;border:1px solid var(--bg3);border-radius:8px;
+  color:var(--muted);font-size:0.82rem;cursor:pointer;transition:all 0.2s;text-decoration:none;white-space:nowrap;}
+.link-btn:hover{background:var(--bg2);color:var(--text);border-color:var(--dim);}
+.progress-bar{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden;
+  margin-top:-6px;margin-bottom:6px;display:none;}
+.progress-bar.active{display:block;}
+.progress-inner{height:100%;width:0%;background:linear-gradient(90deg,var(--blue),var(--purple));transition:width 0.3s;}
+
+/* SECTION DIVIDER */
+.section-title{font-size:0.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:0.08em;padding:8px 0 12px;margin-top:8px;display:flex;align-items:center;gap:10px;}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* BANNERS */
+#no-server-banner{display:none;margin-bottom:16px;padding:12px 18px;
+  background:rgba(227,179,65,0.1);border:1px solid rgba(227,179,65,0.3);
+  border-radius:10px;font-size:0.84rem;color:var(--yellow);
+  display:flex;align-items:center;gap:10px;}
+#no-server-banner.visible{display:flex;}
+#server-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--yellow);}
+.dl-btn.offline{opacity:0.4;cursor:not-allowed;}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted);grid-column:1/-1;}
+.empty-state .icon{font-size:3rem;margin-bottom:12px;}
+
+/* TOAST */
+#toast-container{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:10px;z-index:9999;}
+.toast{padding:12px 18px;border-radius:10px;font-size:0.85rem;max-width:340px;
+  backdrop-filter:blur(12px);animation:toastIn 0.3s ease,toastOut 0.3s ease 4s forwards;
+  box-shadow:0 8px 24px rgba(0,0,0,0.4);}
+.toast.success{background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.3);color:var(--green);}
+.toast.error{background:rgba(248,81,73,0.15);border:1px solid rgba(248,81,73,0.3);color:var(--red);}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateY(8px)}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-logo">🧠 WishAI</div>
+  <div class="topbar-sep"></div>
+  <div class="source-pills">
+    <button class="pill active-sel" id="pill-sel" onclick="setSource('sel')">📌 Notre Sélection</button>
+    <button class="pill" id="pill-hf"  onclick="setSource('hf')">🤗 HuggingFace</button>
+    <button class="pill" id="pill-gh"  onclick="setSource('gh')">🐙 GitHub</button>
+    <button class="pill" id="pill-pw"  onclick="setSource('pw')">📄 Papers with Code</button>
+  </div>
+  <a href="dashboard.html" class="topbar-back">← Dashboard</a>
+</div>
+
+<div class="page-layout">
+  <div id="no-server-banner"><div id="server-status-dot"></div><span>Serveur Python non actif — les téléchargements sont désactivés. Lance <code style="background:rgba(0,0,0,0.3);padding:1px 6px;border-radius:4px;">python go.py</code> pour les activer.</span></div>
+
+  <!-- SEARCH ROW -->
+  <div class="search-row">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Rechercher un dataset..." oninput="onSearch()" onkeydown="if(event.key==='Enter') triggerSearch()" />
+    </div>
+    <div class="filter-selects">
+      <select id="filter-lang" class="custom-select" onchange="triggerSearch()">
+        <option value="all">🌍 Langue</option>
+      </select>
+      <select id="filter-domain" class="custom-select" onchange="triggerSearch()">
+        <option value="all">📂 Domaine</option>
+      </select>
+      <select id="sort-select" class="custom-select sort-select" onchange="triggerSearch()">
+        <option value="downloads">Plus téléchargés</option>
+        <option value="likes">Mieux notés</option>
+        <option value="stars">⭐ Stars</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- SUGGESTIONS -->
+  <div class="sugg-row" id="sugg-row">
+    <span class="sugg-label">Suggestions :</span>
+    <button class="sugg-btn" onclick="quickSearch('medical')">🏥 Médical</button>
+    <button class="sugg-btn" onclick="quickSearch('legal')">⚖️ Droit</button>
+    <button class="sugg-btn" onclick="quickSearch('python code')">💻 Code Python</button>
+    <button class="sugg-btn" onclick="quickSearch('astronomy')">🌌 Astronomie</button>
+    <button class="sugg-btn" onclick="quickSearch('finance')">💰 Finance</button>
+    <button class="sugg-btn" onclick="quickSearch('translation french')">🇫🇷 Traduction FR</button>
+    <button class="sugg-btn" onclick="quickSearch('dialogue chat')">🗣️ Dialogue</button>
+    <button class="sugg-btn" onclick="quickSearch('scientific papers')">🔬 Science</button>
+  </div>
+
+  <div class="results-header">
+    <div class="results-title">
+      <span id="source-label">Notre Sélection</span>
+      <span class="results-count" id="results-count">0</span>
+    </div>
+    <div class="loading-indicator" id="loader">
+      <div class="spinner"></div> Recherche en cours...
+    </div>
+  </div>
+
+  <div class="cards-grid" id="cards-grid"></div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// ─── AUTO-REDIRECT file:// → localhost ─────────────────────────────
+(function() {
+  if (window.location.protocol === 'http:') {
+    // Servi via HTTP : sauvegarder le port pour les prochaines ouvertures en file://
+    try { localStorage.setItem('wishai_port', window.location.port); } catch(e) {}
+    return;
+  }
+  if (window.location.protocol !== 'file:') return;
+  // Ouvert en file:// — tenter redirect vers localhost si serveur actif
+  const _p = localStorage.getItem('wishai_port');
+  if (!_p) return;
+  fetch('http://localhost:' + _p + '/api/ping', {mode:'no-cors', signal:AbortSignal.timeout(1000)})
+    .then(function() { window.location.replace('http://localhost:' + _p + '/library.html'); })
+    .catch(function() { /* serveur inactif, rester en file:// */ });
+})();
+
+// ─── DONNEES EMBARQUEES (fonctionne sans serveur) ─────────
+const _DS_EMBEDDED = [{"id":"fr_wiki","nom":"Wikipedia Français","desc":"L'encyclopédie complète en français. Très propre et structuré.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Encyclopédie","sval":500,"curated":true},{"id":"fr_mc4","nom":"mC4 Français","desc":"Texte web massif nettoyé par Google. Idéal pour la variété lexicale.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Web","sval":500,"curated":true},{"id":"fr_culturax","nom":"CulturaX FR","desc":"Dataset français récent de très haute qualité. Le meilleur pour le français.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Web","sval":500,"curated":true},{"id":"fr_gutenberg","nom":"Project Gutenberg FR","desc":"Livres classiques français (Hugo, Zola, Verne...) en domaine public.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Littérature","sval":200,"curated":true},{"id":"fr_oscar","nom":"OSCAR FR","desc":"Grand corpus web en français. Compte HuggingFace requis.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Web","sval":500,"gated":true,"curated":true},{"id":"fr_cc","nom":"Common Crawl FR","desc":"Web brut extrait directement depuis Common Crawl. Quantité massive.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Web","sval":1000,"curated":true},{"id":"fr_wikisource","nom":"Wikisource Français","desc":"Textes littéraires libres de droits hébergés sur Wikisource : poèmes, essais, discours.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Littérature","sval":100,"raw":true,"raw_id":"Scholarpedia/wikisource","curated":true},{"id":"inst_squad_fr","nom":"SQuAD Français","desc":"L'IA doit trouver la bonne réponse dans un texte. Compréhension de lecture.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Instructions","sval":100,"curated":true},{"id":"en_fineweb","nom":"FineWeb","desc":"Le standard actuel pour entraîner les LLMs professionnels.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Web","sval":500,"curated":true},{"id":"en_finewebedu","nom":"FineWeb-Edu","desc":"FineWeb filtré sur le contenu éducatif uniquement. Idéal pour le raisonnement.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Éducation","sval":500,"curated":true},{"id":"en_wiki","nom":"Wikipedia Anglais","desc":"L'encyclopédie complète en anglais.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Encyclopédie","sval":500,"curated":true},{"id":"en_wikitext","nom":"Wikitext-103","desc":"Extrait classique de Wikipedia, très bien formaté. Idéal pour prototyper.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Encyclopédie","sval":200,"curated":true},{"id":"en_openweb","nom":"OpenWebText","desc":"Réplication des données ayant servi à entraîner GPT-2.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Web","sval":200,"curated":true},{"id":"en_c4","nom":"C4 (Google)","desc":"Corpus web propre utilisé pour entraîner T5 et Flan.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Web","sval":500,"curated":true},{"id":"en_cc","nom":"Common Crawl Anglais","desc":"Web brut en anglais, extrêmement massif.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Web","sval":1000,"curated":true},{"id":"en_pile_hn","nom":"HackerNews (The Pile)","desc":"Discussions tech de HackerNews. Haut niveau, sujets pointus.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Forum","sval":200,"curated":true},{"id":"en_gutenberg","nom":"Project Gutenberg Anglais","desc":"50 000+ livres classiques libres de droits : Shakespeare, Dickens, Austen...","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Littérature","sval":500,"raw":true,"raw_id":"pgcorpus/gutenberg","curated":true},{"id":"en_books3","nom":"Books3 (The Pile)","desc":"200 000+ livres complets numérisés. La plus grande bibliothèque numérique ouverte.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Littérature","sval":500,"raw":true,"raw_id":"the_pile_books3","curated":true},{"id":"code_stack","nom":"The Stack — Python","desc":"Immense corpus de code Python propre issu de GitHub. Pour un Copilot.","lang":"Code","hf_lang":"en","flag":"💻","domain":"Programmation","sval":500,"curated":true},{"id":"code_stack_js","nom":"The Stack — JS/HTML/CSS","desc":"Code JavaScript, HTML et CSS propre issu de GitHub.","lang":"Code","hf_lang":"en","flag":"💻","domain":"Programmation","sval":500,"curated":true},{"id":"code_search","nom":"CodeSearchNet","desc":"Code Python couplé à ses docstrings. Pour apprendre à documenter.","lang":"Code","hf_lang":"en","flag":"💻","domain":"Programmation","sval":200,"curated":true},{"id":"code_stackoverflow","nom":"StackOverflow Q&A","desc":"Questions et réponses de développeurs. Pour apprendre à déboguer.","lang":"Code","hf_lang":"en","flag":"💻","domain":"Programmation","sval":300,"curated":true},{"id":"code_starcoder","nom":"StarCoder Data","desc":"Données de code multi-langage de haute qualité. Compte HF requis.","lang":"Code","hf_lang":"en","flag":"💻","domain":"Programmation","sval":500,"gated":true,"curated":true},{"id":"code_leetcode","nom":"LeetCode Problems","desc":"Problèmes algorithmiques (algo, structures de données) avec solutions en code.","lang":"Code","hf_lang":"en","flag":"💻","domain":"Programmation","sval":50,"raw":true,"raw_id":"greengerong/leetcode","curated":true},{"id":"sci_openwebmath","nom":"OpenWebMath","desc":"Mathématiques de haut niveau, inclut le format LaTeX. Pour les modèles logiques.","lang":"Mathématiques","hf_lang":"en","flag":"🔢","domain":"Science","sval":200,"curated":true},{"id":"sci_proofpile","nom":"Proof-Pile","desc":"Démonstrations mathématiques et preuves formelles.","lang":"Mathématiques","hf_lang":"en","flag":"🔢","domain":"Science","sval":200,"curated":true},{"id":"sci_arxiv","nom":"ArXiv ML Papers","desc":"Résumés d'articles de recherche en Machine Learning issus d'ArXiv.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Science","sval":200,"curated":true},{"id":"sci_pubmed","nom":"PubMed","desc":"Littérature médicale et biologique. Pour créer un assistant médical.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Médecine","sval":500,"curated":true},{"id":"sci_phil","nom":"PhilPapers","desc":"Articles académiques de philosophie. Style argumentatif structuré.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Philosophie","sval":200,"curated":true},{"id":"inst_hermes","nom":"OpenHermes 2.5","desc":"Le sommet de la qualité pour entraîner un LLM open-source intelligent.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Instructions","sval":200,"curated":true},{"id":"inst_alpaca","nom":"Alpaca Clean","desc":"Les données originelles de Stanford pour rendre l'IA obéissante.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Instructions","sval":100,"curated":true},{"id":"inst_dolly","nom":"Dolly 15k","desc":"15 000 instructions écrites par de vrais humains. Ton naturel et varié.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Instructions","sval":100,"curated":true},{"id":"inst_tinystories","nom":"TinyStories","desc":"Histoires courtes simples. Idéal pour commencer ou tester un petit modèle.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Littérature","sval":100,"curated":true},{"id":"inst_ultrachat","nom":"UltraChat 200k","desc":"200k conversations synthétiques de haute qualité. Excellent pour les chatbots.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Instructions","sval":200,"raw":true,"raw_id":"HuggingFaceH4/ultrachat_200k","curated":true},{"id":"inst_lmsys","nom":"LMSYS-Chat-1M","desc":"1 million de vraies conversations avec des LLMs. Le dataset de chat le plus réaliste.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Instructions","sval":300,"raw":true,"raw_id":"lmsys/lmsys-chat-1m","curated":true},{"id":"inst_oasst","nom":"OpenAssistant OASST1","desc":"Conversations humaines annotées pour l'alignement. Qualité exceptionnelle.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Instructions","sval":100,"raw":true,"raw_id":"OpenAssistant/oasst1","curated":true},{"id":"dial_daily","nom":"DailyDialog","desc":"Conversations quotidiennes de bonne qualité. Pour des chatbots naturels.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Dialogues","sval":100,"curated":true},{"id":"dial_movies","nom":"OpenSubtitles","desc":"Millions de dialogues de films et séries TV. Répliques très naturelles.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Dialogues","sval":500,"curated":true},{"id":"dial_ubuntu","nom":"Ubuntu Dialogue Corpus","desc":"Conversations de support technique Ubuntu. Pour un assistant IT.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Dialogues","sval":200,"curated":true},{"id":"dial_reddit","nom":"Reddit TL;DR","desc":"Apprenez à l'IA à résumer des discussions Reddit automatiquement.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Dialogues","sval":200,"curated":true},{"id":"dial_persona","nom":"PersonaChat","desc":"Chaque personnage a un trait de personnalité. Pour des IA avec du caractère.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Dialogues","sval":100,"curated":true},{"id":"dial_quora","nom":"Quora Question Pairs","desc":"Paires de questions similaires. Pour comprendre les nuances sémantiques.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Dialogues","sval":100,"raw":true,"raw_id":"quora","curated":true},{"id":"news_cc","nom":"CC-News","desc":"Actualités mondiales extraites de Common Crawl. Écriture journalistique.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Actualités","sval":300,"raw":true,"raw_id":"cc_news","curated":true},{"id":"news_wikinews","nom":"Wikinews","desc":"Actualités open-source de Wikimedia. Multilingue et bien structuré.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Actualités","sval":100,"raw":true,"raw_id":"rceborg/wikinews-multilingual","curated":true},{"id":"multi_cc","nom":"Common Crawl Multilingue","desc":"Web brut dans toutes les langues. Extrêmement massif.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Web","sval":1000,"curated":true},{"id":"multi_madlad","nom":"MADLAD-400 (Google)","desc":"400 langues, produit par Google. Le dataset multilingue le plus complet.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Web","sval":500,"gated":true,"curated":true},{"id":"multi_opus","nom":"OPUS-100","desc":"100 langues, corpus de traduction parallèle massif. Idéal pour le multilingue.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Traduction","sval":300,"raw":true,"raw_id":"opus100","curated":true},{"id":"de_wiki","nom":"Wikipedia Allemand","desc":"L'encyclopédie complète en allemand. L'une des plus grandes Wikipédias.","lang":"Allemand","hf_lang":"de","flag":"🇩🇪","domain":"Encyclopédie","sval":300,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"zh_wiki","nom":"Wikipedia Chinois","desc":"L'encyclopédie complète en mandarin. Corpus de référence pour le NLP en chinois simplifié.","lang":"Chinois","hf_lang":"zh","flag":"🇨🇳","domain":"Encyclopédie","sval":300,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"es_wiki","nom":"Wikipedia Espagnol","desc":"L'encyclopédie complète en espagnol. L'une des plus grandes Wikipédias du monde.","lang":"Espagnol","hf_lang":"es","flag":"🇪🇸","domain":"Encyclopédie","sval":300,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"fr_news","nom":"Actualités Françaises","desc":"Corpus de presse francophone : Le Monde, Le Figaro, Libération, AFP. Idéal pour l'actualité et le style journalistique.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Actualités","sval":300,"raw":true,"raw_id":"cc_news","curated":true},{"id":"fr_legal","nom":"Textes Juridiques FR","desc":"Lois, décrets, jurisprudence et codes français. Corpus juridique complet issu de Légifrance et du Journal Officiel.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Droit","sval":200,"raw":true,"raw_id":"joelito/french_legal_corpus","curated":true},{"id":"fr_europarl","nom":"Europarl Français","desc":"Débats du Parlement Européen en français. Langue formelle et politique, parfait pour la traduction et le style institutionnel.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Traduction","sval":200,"raw":true,"raw_id":"Helsinki-NLP/europarl","curated":true},{"id":"fr_openhermes","nom":"OpenHermes Français","desc":"Dataset d'instructions et de dialogues synthétiques traduit en français. Basé sur OpenHermes 2.5, très utilisé pour les LLM français.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Instructions","sval":150,"raw":true,"raw_id":"jpacifico/french-instruct","curated":true},{"id":"fr_cabernet","nom":"CaBeRNet FR","desc":"Corpus de français écrit natif : littérature contemporaine, blogs, forums. Naturel et diversifié pour capturer la langue française actuelle.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Web","sval":200,"raw":true,"raw_id":"Nicolas-BZRD/Collected_French_texts_Web","curated":true},{"id":"fr_storiesdev","nom":"Histoires Françaises","desc":"Collection de nouvelles et histoires courtes en français. Parfait pour entraîner la créativité et la narration.","lang":"Français","hf_lang":"fr","flag":"🇫🇷","domain":"Littérature","sval":100,"raw":true,"raw_id":"Nicolas-BZRD/Collected_French_texts_Web","curated":true},{"id":"en_redpajama","nom":"RedPajama","desc":"Reproduction open-source de LLaMA training data : Wikipedia, C4, GitHub, Books, ArXiv, StackExchange. 1.2T tokens.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Web","sval":500,"raw":true,"raw_id":"togethercomputer/RedPajama-Data-1T","curated":true},{"id":"en_cosmopedia","nom":"Cosmopedia","desc":"2.7M textes synthétiques générés par Mixtral : textbooks, blog posts, histoires éducatives. Très riche pour l'apprentissage.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Éducation","sval":400,"raw":true,"raw_id":"HuggingFaceTB/cosmopedia","curated":true},{"id":"en_dolmino","nom":"Dolmino","desc":"Dataset de préentraînement d'AI2 : web, code, academic, books. Filtré et nettoyé, licence ouverte. Excellent pour un GPT général.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Web","sval":500,"raw":true,"raw_id":"allenai/dolmino-mix-1124","curated":true},{"id":"en_refinedweb","nom":"RefinedWeb","desc":"Web corpus ultra-filtré utilisé pour entraîner Falcon. 968B tokens de données web de haute qualité.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Web","sval":500,"raw":true,"raw_id":"tiiuae/falcon-refinedweb","curated":true},{"id":"en_peS2o","nom":"peS2o","desc":"60M papiers scientifiques de Semantic Scholar. Parfait pour l'anglais académique, les abstracts et les corpus scientifiques.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Science","sval":300,"raw":true,"raw_id":"allenai/peS2o","curated":true},{"id":"en_sharegpt","nom":"ShareGPT Conversations","desc":"90k conversations réelles entre utilisateurs et ChatGPT. Parfait pour les dialogues multi-tours et le style conversationnel GPT.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Dialogues","sval":100,"raw":true,"raw_id":"anon8231489123/ShareGPT_Vicuna_unfiltered","curated":true},{"id":"en_openhermes","nom":"OpenHermes 2.5","desc":"1M instructions synthétiques de haute qualité. L'un des meilleurs datasets d'instruction tuning, généré par GPT-4. Références dans Hermes-2.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Instructions","sval":200,"raw":true,"raw_id":"teknium/OpenHermes-2.5","curated":true},{"id":"en_slim_orca","nom":"SlimOrca","desc":"517k instructions sélectionnées par qualité depuis OpenOrca. Subset de haute qualité, très efficace pour le fine-tuning.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Instructions","sval":150,"raw":true,"raw_id":"Open-Orca/SlimOrca","curated":true},{"id":"en_ultrafeedback","nom":"UltraFeedback","desc":"254k instructions avec évaluations GPT-4 pour l'apprentissage par préférence (RLHF/DPO). Très utilisé pour l'alignement.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Instructions","sval":150,"raw":true,"raw_id":"openbmb/UltraFeedback","curated":true},{"id":"en_capybara","nom":"Capybara","desc":"Instructions synthétiques multi-tours basées sur de la connaissance diverse. Couvre 16 domaines académiques.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Instructions","sval":100,"raw":true,"raw_id":"LDJnr/Capybara","curated":true},{"id":"en_airoboros","nom":"Airoboros","desc":"Dataset d'instructions synthétiques autogénérées. Couvre raisonnement, codage, créativité, maths et connaissances générales.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Instructions","sval":100,"raw":true,"raw_id":"jondurbin/airoboros-3.2","curated":true},{"id":"en_evol_instruct","nom":"Evol-Instruct","desc":"250k instructions évoluées automatiquement par WizardLM. Augmente la complexité et la diversité des instructions de base.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Instructions","sval":150,"raw":true,"raw_id":"WizardLMTeam/WizardLM_evol_instruct_V2_196k","curated":true},{"id":"en_hh_rlhf","nom":"Helpful & Harmless RLHF","desc":"Anthropic : 170k comparaisons humaines pour l'alignement (utile vs nuisible). Fondamental pour apprendre les préférences humaines.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Instructions","sval":100,"raw":true,"raw_id":"Anthropic/hh-rlhf","curated":true},{"id":"code_stack_v2","nom":"The Stack v2","desc":"Version améliorée de The Stack : 67TB de code provenant de GitHub dans plus de 600 langages. Le plus grand dataset de code open-source.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Programmation","sval":500,"raw":true,"raw_id":"bigcode/the-stack-v2","curated":true},{"id":"code_python_inst","nom":"Python Code Instructions","desc":"18k instructions Python avec code commenté, généré à partir de questions StackOverflow et GitHub Copilot prompts.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Programmation","sval":50,"raw":true,"raw_id":"iamtarun/python_code_instructions_18k_alpaca","curated":true},{"id":"code_humaneval","nom":"HumanEval","desc":"164 problèmes de programmation Python créés par OpenAI. Benchmark de référence pour évaluer la génération de code.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Programmation","sval":10,"raw":true,"raw_id":"openai/openai_humaneval","curated":true},{"id":"code_mbpp","nom":"MBPP — Python Problems","desc":"974 problèmes de programmation Python du niveau débutant à intermédiaire. Inclut les énoncés, solutions et tests.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Programmation","sval":20,"raw":true,"raw_id":"google-research-datasets/mbpp","curated":true},{"id":"code_apps","nom":"APPS — Coding Problems","desc":"10k problèmes de programmation compétitifs avec solutions en Python. Difficulté variable : débutant, interview, compétition.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Programmation","sval":100,"raw":true,"raw_id":"codeparrot/apps","curated":true},{"id":"code_deepmind","nom":"CodeContests","desc":"Problèmes et solutions de Codeforces, AtCoder, HackerEarth — compilation de DeepMind. Niveau compétitif avancé.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Programmation","sval":100,"raw":true,"raw_id":"deepmind/code_contests","curated":true},{"id":"code_jupyter","nom":"Jupyter Notebooks","desc":"Notebooks Jupyter publics collectés depuis GitHub. Python, données scientifiques, ML : code avec contexte et explications.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Programmation","sval":200,"raw":true,"raw_id":"codeparrot/github-jupyter-text-code-pairs","curated":true},{"id":"code_rust","nom":"Rust Code","desc":"Codebase Rust extrait de GitHub et crates.io. Excellent pour apprendre les patterns de code systèmes et Rust idiomatique.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Programmation","sval":200,"raw":true,"raw_id":"the-stack-smol","curated":true},{"id":"math_gsm8k","nom":"GSM8K — Maths Primaire","desc":"8.5k problèmes de maths niveau primaire/collège avec solutions en langage naturel. Référence absolue pour le raisonnement mathématique.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Mathématiques","sval":20,"raw":true,"raw_id":"openai/gsm8k","curated":true},{"id":"math_competition","nom":"MATH Competition","desc":"12.5k problèmes de compétitions mathématiques (AMC, AIME, MATHCOUNTS) avec solutions complètes. 5 niveaux de difficulté.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Mathématiques","sval":30,"raw":true,"raw_id":"hendrycks/competition_math","curated":true},{"id":"math_metamath","nom":"MetaMath","desc":"395k problèmes mathématiques augmentés et reformulés depuis GSM8K et MATH. Très efficace pour l'entraînement au raisonnement mathématique.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Mathématiques","sval":100,"raw":true,"raw_id":"meta-math/MetaMathQA","curated":true},{"id":"math_numina","nom":"NuminaMath","desc":"860k problèmes de maths issus de compétitions mondiales (olympiades, AMC, AIME, Lean). Couvre algèbre, géométrie, combinatoire.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Mathématiques","sval":200,"raw":true,"raw_id":"AI-MO/NuminaMath-CoT","curated":true},{"id":"math_aqua","nom":"AQuA-RAT","desc":"100k problèmes de raisonnement algébrique avec rationale (explication étape par étape). Parfait pour enseigner le raisonnement en chaîne.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Mathématiques","sval":50,"raw":true,"raw_id":"deepmind/aqua_rat","curated":true},{"id":"sci_s2orc","nom":"Semantic Scholar ORC","desc":"81M papiers académiques full-text de Semantic Scholar. Le plus grand corpus de littérature scientifique ouverte.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Science","sval":500,"raw":true,"raw_id":"allenai/s2orc","curated":true},{"id":"sci_openreview","nom":"OpenReview Papers","desc":"Papiers soumis à NeurIPS, ICLR, ICML avec reviews. Permet d'apprendre la structure des papiers ML et les critiques scientifiques.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Science","sval":100,"raw":true,"raw_id":"openreview-archive/openreview","curated":true},{"id":"sci_biology","nom":"Biology Literature","desc":"Articles biologiques de PubMed Central couvrant génomique, protéomique, biochimie et biologie moléculaire.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Science","sval":200,"raw":true,"raw_id":"bigbio/pubmed","curated":true},{"id":"sci_chemistry","nom":"ChemRxiv Preprints","desc":"Préprints de chimie : synthèse, réactions, matériaux, chimie computationnelle. Base de données de ChemRxiv.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Science","sval":100,"raw":true,"raw_id":"chemrxiv","curated":true},{"id":"sci_medical_qa","nom":"MedQA","desc":"Questions d'examens médicaux USMLE avec explications. 12k QCM de niveau médecin généraliste / spécialiste.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Médecine","sval":30,"raw":true,"raw_id":"GBaker/MedQA-USMLE-4-options","curated":true},{"id":"sci_clinical_notes","nom":"Clinical Notes","desc":"Notes cliniques anonymisées de MIMIC-III. Rapports de médecins, diagnostics, prescriptions. Langue médicale spécialisée.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Médecine","sval":200,"raw":true,"raw_id":"physionet/mimic-iv-note","curated":true},{"id":"it_wiki","nom":"Wikipedia Italien","desc":"Encyclopédie complète en italien. Langue romane avec 1.8M articles. Excellente base pour l'italien académique et factuel.","lang":"Italien","hf_lang":"it","flag":"🇮🇹","domain":"Encyclopédie","sval":300,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"pt_wiki","nom":"Wikipedia Portugais","desc":"Encyclopédie en portugais brésilien et européen. 1M+ articles couvrant le monde lusophone.","lang":"Portugais","hf_lang":"pt","flag":"🇧🇷","domain":"Encyclopédie","sval":300,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"ru_wiki","nom":"Wikipedia Russe","desc":"1.9M articles en cyrillique. L'une des plus grandes Wikipédias, couvre la culture, l'histoire et les sciences russophone.","lang":"Russe","hf_lang":"ru","flag":"🇷🇺","domain":"Encyclopédie","sval":400,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"nl_wiki","nom":"Wikipedia Néerlandais","desc":"Wikipedia en néerlandais : 2.1M articles, l'une des plus grandes. Science, culture et histoire des Pays-Bas et Belgique.","lang":"Néerlandais","hf_lang":"nl","flag":"🇳🇱","domain":"Encyclopédie","sval":200,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"pl_wiki","nom":"Wikipedia Polonais","desc":"Encyclopédie en polonais : 1.5M articles. Langue slave occidentale, très représentée sur Wikipedia.","lang":"Polonais","hf_lang":"pl","flag":"🇵🇱","domain":"Encyclopédie","sval":200,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"sv_wiki","nom":"Wikipedia Suédois","desc":"2.6M articles en suédois — l'une des plus grandes Wikipédias. Langue nordique, très complète.","lang":"Suédois","hf_lang":"sv","flag":"🇸🇪","domain":"Encyclopédie","sval":200,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"uk_wiki","nom":"Wikipedia Ukrainien","desc":"Wikipedia en ukrainien : 1.3M articles. Langue slave orientale, distincte du russe. Corpus riche post-2022.","lang":"Ukrainien","hf_lang":"uk","flag":"🇺🇦","domain":"Encyclopédie","sval":150,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"cs_wiki","nom":"Wikipedia Tchèque","desc":"Encyclopédie en tchèque : 500k articles. Langue slave avec diacritiques, parfaite pour les corpus d'Europe centrale.","lang":"Tchèque","hf_lang":"cs","flag":"🇨🇿","domain":"Encyclopédie","sval":150,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"ro_wiki","nom":"Wikipedia Roumain","desc":"Encyclopédie en roumain : 400k articles. Seule grande langue romane en Europe orientale.","lang":"Roumain","hf_lang":"ro","flag":"🇷🇴","domain":"Encyclopédie","sval":100,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"hu_wiki","nom":"Wikipedia Hongrois","desc":"Encyclopédie en hongrois (Magyar) : 540k articles. Langue finno-ougrienne, syntaxe unique, agglutinante.","lang":"Hongrois","hf_lang":"hu","flag":"🇭🇺","domain":"Encyclopédie","sval":100,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"fi_wiki","nom":"Wikipedia Finnois","desc":"535k articles en finnois. Langue finno-ougrienne avec déclinaisons complexes. Corpus Wikipedia complet.","lang":"Finlandais","hf_lang":"fi","flag":"🇫🇮","domain":"Encyclopédie","sval":100,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"da_wiki","nom":"Wikipedia Danois","desc":"290k articles en danois. Langue nordique germanique, proche du norvégien et suédois.","lang":"Danois","hf_lang":"da","flag":"🇩🇰","domain":"Encyclopédie","sval":80,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"no_wiki","nom":"Wikipedia Norvégien","desc":"Wikipedia Bokmål : 600k articles en norvégien. Langue scandinave écrite la plus proche du danois.","lang":"Norvégien","hf_lang":"no","flag":"🇳🇴","domain":"Encyclopédie","sval":100,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"ja_wiki","nom":"Wikipedia Japonais","desc":"1.4M articles en japonais (hiragana, katakana, kanji). L'une des plus grandes Wikipédias asiatiques.","lang":"Japonais","hf_lang":"ja","flag":"🇯🇵","domain":"Encyclopédie","sval":400,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"ko_wiki","nom":"Wikipedia Coréen","desc":"Encyclopédie en hangul : 690k articles. Couvre la culture, l'histoire et les sciences coréennes.","lang":"Coréen","hf_lang":"ko","flag":"🇰🇷","domain":"Encyclopédie","sval":200,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"ar_wiki","nom":"Wikipedia Arabe","desc":"1.2M articles en arabe. Langue sémitique, s'écrit de droite à gauche. Couvre tout le monde arabophone.","lang":"Arabe","hf_lang":"ar","flag":"🇸🇦","domain":"Encyclopédie","sval":300,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"hi_wiki","nom":"Wikipedia Hindi","desc":"Encyclopédie en devanagari : 160k articles. Hindi, langue officielle de l'Inde, 600M de locuteurs.","lang":"Hindi","hf_lang":"hi","flag":"🇮🇳","domain":"Encyclopédie","sval":150,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"tr_wiki","nom":"Wikipedia Turc","desc":"490k articles en turc. Langue agglutinante, corpus riche couvrant la Turquie et le monde turcophone.","lang":"Turc","hf_lang":"tr","flag":"🇹🇷","domain":"Encyclopédie","sval":150,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"vi_wiki","nom":"Wikipedia Vietnamien","desc":"1.3M articles en vietnamien (langue tonale, écriture latine). L'une des plus grandes Wikipédias d'Asie du Sud-Est.","lang":"Vietnamien","hf_lang":"vi","flag":"🇻🇳","domain":"Encyclopédie","sval":200,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"id_wiki","nom":"Wikipedia Indonésien","desc":"680k articles en bahasa Indonesia. Langue officielle d'Indonésie (270M habitants), base latine simple.","lang":"Indonésien","hf_lang":"id","flag":"🇮🇩","domain":"Encyclopédie","sval":150,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"fa_wiki","nom":"Wikipedia Persan","desc":"930k articles en persan (farsi), écriture arabe. Langue indo-iranienne parlée en Iran, Afghanistan et Tadjikistan.","lang":"Persan","hf_lang":"fa","flag":"🇮🇷","domain":"Encyclopédie","sval":200,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"he_wiki","nom":"Wikipedia Hébreu","desc":"320k articles en hébreu (écriture droite-gauche). Langue sémitique revitalisée, parlée en Israël.","lang":"Hébreu","hf_lang":"he","flag":"🇮🇱","domain":"Encyclopédie","sval":100,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"th_wiki","nom":"Wikipedia Thaï","desc":"160k articles en thaï (script thaï, sans espaces). Langue tonale d'Asie du Sud-Est avec écriture unique.","lang":"Thaï","hf_lang":"th","flag":"🇹🇭","domain":"Encyclopédie","sval":80,"raw":true,"raw_id":"wikimedia/wikipedia","curated":true},{"id":"multi_mC4","nom":"mC4 — Multilingue","desc":"Version multilingue de C4 : 101 langues, données web filtrées. 26TB de texte propre. Base de mT5 et mT0.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Web","sval":500,"raw":true,"raw_id":"allenai/c4","curated":true},{"id":"multi_cc100","nom":"CC-100 Multilingue","desc":"Web crawl en 100 langues filtré depuis CommonCrawl. Base de XLM-R. Couvre presque toutes les langues écrites.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Web","sval":500,"raw":true,"raw_id":"statmt/cc100","curated":true},{"id":"multi_xnli","nom":"XNLI — Inférence 15 langues","desc":"Inférence en langage naturel en 15 langues. Benchmark de référence pour le NLI multilingue cross-lingual.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Raisonnement","sval":20,"raw":true,"raw_id":"facebook/xnli","curated":true},{"id":"multi_flores","nom":"FLORES-200","desc":"Benchmark de traduction dans 200 langues dont des langues rares. 1k phrases de Wikipedia traduit par des humains. Meta AI.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Traduction","sval":10,"raw":true,"raw_id":"facebook/flores","curated":true},{"id":"multi_tatoeba","nom":"Tatoeba — Phrases Parallèles","desc":"10M+ paires de phrases dans 400 langues. Créées par la communauté, idéales pour la traduction et l'apprentissage multilingue.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Traduction","sval":100,"raw":true,"raw_id":"Helsinki-NLP/tatoeba_mt","curated":true},{"id":"multi_paracrawl","nom":"ParaCrawl","desc":"Corpus de traduction parallèle 23 langues européennes — anglais. Extrait automatiquement du web. 450M+ paires de phrases.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Traduction","sval":300,"raw":true,"raw_id":"Helsinki-NLP/europarl","curated":true},{"id":"legal_pile","nom":"The Pile of Law","desc":"Corpus juridique : jurisprudence US, EU, Royaume-Uni. Décisions de cours, statuts, règlements. 250GB de texte légal.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Droit","sval":300,"raw":true,"raw_id":"pile-of-law/pile-of-law","curated":true},{"id":"fin_news","nom":"Financial News","desc":"Articles financiers de Bloomberg, Reuters, CNBC. Parfait pour les modèles finance, analyse de sentiments et NLP économique.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Finance","sval":100,"raw":true,"raw_id":"zeroshot/twitter-financial-news-sentiment","curated":true},{"id":"fin_instruct","nom":"Finance Instruct","desc":"Instructions et Q&A dans le domaine financier : rapports annuels, analyse boursière, comptabilité, économie.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Finance","sval":100,"raw":true,"raw_id":"FinGPT/fingpt-sentiment-train","curated":true},{"id":"hist_wiki_events","nom":"WikiEvents — Histoire","desc":"Chronologie d'événements historiques extraite de Wikipedia. Dates, lieux, personnages. Parfait pour l'histoire mondiale.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Histoire","sval":50,"raw":true,"raw_id":"wikidata","curated":true},{"id":"phil_texts","nom":"Textes Philosophiques","desc":"Œuvres philosophiques numérisées : Platon, Kant, Nietzsche, Descartes, Spinoza. Sources Project Gutenberg et Wikisource.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Philosophie","sval":100,"raw":true,"raw_id":"philosopherq/philosopher","curated":true},{"id":"edu_textbooks","nom":"Open Textbooks","desc":"Manuels scolaires open-source : mathématiques, physique, chimie, biologie, économie. Niveau lycée à universitaire.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Éducation","sval":200,"raw":true,"raw_id":"HuggingFaceTB/cosmopedia","curated":true},{"id":"edu_khan","nom":"KhanAcademy Content","desc":"Contenu éducatif de Khan Academy : explications structurées niveau collège-lycée en maths, sciences, histoire, économie.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Éducation","sval":100,"raw":true,"raw_id":"HuggingFaceTB/cosmopedia","curated":true},{"id":"news_realtime","nom":"CC-News Corpus","desc":"Articles de presse du monde entier collectés depuis CommonCrawl News. 200k articles/jour, 60+ langues.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Actualités","sval":300,"raw":true,"raw_id":"cc_news","curated":true},{"id":"lit_bookcorpus","nom":"BookCorpus","desc":"11k livres non publiés d'auteurs indie. Base d'entraînement BERT et GPT-2 originaux. Romans, fiction, aventure.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Littérature","sval":200,"raw":true,"raw_id":"bookcorpus/bookcorpus","curated":true},{"id":"lit_gutenberg_multi","nom":"Project Gutenberg Multi","desc":"70k livres du domaine public en 50+ langues. Classiques de la littérature mondiale : Dickens, Hugo, Cervantes, Tolstoï.","lang":"Multilingue","hf_lang":"multi","flag":"🌍","domain":"Littérature","sval":300,"raw":true,"raw_id":"gutenberg","curated":true},{"id":"lit_fanfiction","nom":"FanFiction Stories","desc":"Histoires de fans en anglais : fantasy, romance, sci-fi, crossovers. Créativité libre, style narratif varié.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Littérature","sval":200,"raw":true,"raw_id":"thefountainhead/fanfic","curated":true},{"id":"lit_poetry","nom":"Poetry Foundation","desc":"Poèmes en anglais de la Poetry Foundation : 10k poèmes classiques et contemporains avec métadonnées auteur/époque.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Littérature","sval":30,"raw":true,"raw_id":"merve/poetry","curated":true},{"id":"lit_screenplays","nom":"Movie Scripts","desc":"Scénarios de films et séries : dialogues naturels, descriptions de scènes. Parfait pour apprendre le style conversationnel cinématographique.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Dialogues","sval":100,"raw":true,"raw_id":"mattismegevand/cornell-movie-dialogs","curated":true},{"id":"qa_squad2","nom":"SQuAD 2.0","desc":"150k questions sur Wikipedia (dont 50k sans réponse). Benchmark de lecture compréhensive de référence depuis Stanford.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Question-Réponse","sval":30,"raw":true,"raw_id":"rajpurkar/squad_v2","curated":true},{"id":"qa_natural_questions","nom":"Natural Questions","desc":"307k vraies questions Google avec réponses extraites de Wikipedia. Représente les vraies requêtes d'utilisateurs réels.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Question-Réponse","sval":50,"raw":true,"raw_id":"google-research-datasets/natural_questions","curated":true},{"id":"qa_trivia","nom":"TriviaQA","desc":"650k paires question-réponse de quiz avec preuves documentaires. Connaissances générales, histoire, science, culture populaire.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Question-Réponse","sval":50,"raw":true,"raw_id":"trivia_qa","curated":true},{"id":"qa_hotpotqa","nom":"HotpotQA","desc":"113k questions multi-saut nécessitant de raisonner sur plusieurs documents Wikipedia. Raisonnement complexe et enchaîné.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Raisonnement","sval":30,"raw":true,"raw_id":"hotpot_qa","curated":true},{"id":"qa_commonsense","nom":"CommonsenseQA","desc":"12k questions de bon sens nécessitant une connaissance du monde réel. Les modèles doivent raisonner comme les humains.","lang":"Anglais","hf_lang":"en","flag":"🇬🇧","domain":"Raisonnement","sval":20,"raw":true,"raw_id":"tau/commonsense_qa","curated":true}];
+
+// ─── STATEE ────────────────────────────────────
+let LOCAL_DATA  = [];
+let serverOnline = false;
+let currentSrc  = 'sel';
+let debounceTimer = null;
+
+const PILL_CLASSES = {sel:'active-sel',hf:'active-hf',gh:'active-gh',pw:'active-pw'};
+const SRC_LABELS   = {
+  sel:'Notre Sélection',
+  hf:'HuggingFace — 150 000+ datasets',
+  gh:'GitHub Datasets',
+  pw:'Papers with Code'
+};
+
+// ─── SOURCE SWITCH ────────────────────────────
+function setSource(src) {
+  currentSrc = src;
+  ['sel','hf','gh','pw'].forEach(s => {
+    const p = document.getElementById('pill-'+s);
+    p.className = 'pill' + (s === src ? ' '+PILL_CLASSES[s] : '');
+  });
+  document.getElementById('source-label').textContent = SRC_LABELS[src];
+
+  // Sort select visible only for API sources
+  document.getElementById('sort-select').classList.toggle('visible', src !== 'sel');
+  // Suggestions visible for API sources
+  document.getElementById('sugg-row').classList.toggle('visible', src !== 'sel');
+  // Lang/domain only for local
+  document.getElementById('filter-lang').style.display   = src === 'sel' ? '' : 'none';
+  document.getElementById('filter-domain').style.display = src === 'sel' ? '' : 'none';
+
+  const q = document.getElementById('search-input').value.trim();
+  if (src === 'sel') {
+    renderLocal();
+  } else if (q) {
+    triggerSearch();
+  } else {
+    document.getElementById('cards-grid').innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Tape un mot-clé pour rechercher sur ${SRC_LABELS[src]}.</p></div>`;
+    document.getElementById('results-count').textContent = '0';
+  }
+}
+
+// ─── SEARCH ORCHESTRATOR ─────────────────────
+function onSearch() {
+  if (currentSrc === 'sel') {
+    renderLocal();
+    return;
+  }
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(triggerSearch, 500);
+}
+
+function triggerSearch() {
+  if (currentSrc === 'sel') { renderLocal(); return; }
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) {
+    document.getElementById('cards-grid').innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Tape un mot-clé pour rechercher.</p></div>`;
+    document.getElementById('results-count').textContent = '0';
+    return;
+  }
+  if (currentSrc === 'hf') searchHF(q);
+  else if (currentSrc === 'gh') searchGitHub(q);
+  else if (currentSrc === 'pw') searchPapersWithCode(q);
+}
+
+function quickSearch(q) {
+  document.getElementById('search-input').value = q;
+  triggerSearch();
+}
+
+// ─── LOCAL ────────────────────────────────────
+async function loadLocalData() {
+  if (window.location.protocol === 'file:') {
+    LOCAL_DATA = _DS_EMBEDDED.filter(d => d.curated !== false);
+  } else {
+    try {
+      const all = await (await fetch('/src/datasets.json?ts='+Date.now())).json();
+      LOCAL_DATA = all.filter(d => d.curated !== false);
+    } catch(e) { LOCAL_DATA = _DS_EMBEDDED.filter(d => d.curated !== false); }
+  }
+  buildLocalFilters();
+  renderLocal();
+}
+
+function buildLocalFilters() {
+  const langs = new Set(); const doms = new Set();
+  LOCAL_DATA.forEach(d => { langs.add(d.flag+' '+d.lang); doms.add(d.domain); });
+  const ls = document.getElementById('filter-lang');
+  Array.from(langs).sort().forEach(l => {
+    const o = document.createElement('option');
+    o.value = l.split(' ').slice(1).join(' '); o.textContent = l; ls.appendChild(o);
+  });
+  const ds = document.getElementById('filter-domain');
+  Array.from(doms).sort().forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = '📂 '+d; ds.appendChild(o);
+  });
+}
+
+function renderLocal() {
+  const q     = document.getElementById('search-input').value.toLowerCase().trim();
+  const langF = document.getElementById('filter-lang').value;
+  const domF  = document.getElementById('filter-domain').value;
+  const list  = LOCAL_DATA.filter(d => {
+    const mq = !q || d.nom.toLowerCase().includes(q) || (d.desc||'').toLowerCase().includes(q);
+    const ml = langF === 'all' || d.lang === langF;
+    const md = domF  === 'all' || d.domain === domF;
+    return mq && ml && md;
+  });
+  document.getElementById('results-count').textContent = list.length;
+  drawCards(list.map(d => ({
+    id: d.raw ? d.raw_id : d.id,
+    nom: d.nom, desc: d.desc,
+    tagLang: d.flag+' '+d.lang, tagDom: d.domain,
+    icon: domIcon(d.domain), sval: d.sval||200,
+    hf_lang: d.hf_lang, isRaw: !!d.raw, canDL: true,
+    badge: '<span class="src-badge sel">📌 Notre Sélection</span>',
+    extraTags: d.gated ? ['<span class="tag tag-gated">⚠️ Compte HF</span>'] : [],
+    link: null,
+  })));
+}
+
+// ─── HUGGINGFACE API ─────────────────────────
+async function searchHF(q) {
+  const sort = document.getElementById('sort-select').value === 'stars' ? 'downloads' : document.getElementById('sort-select').value;
+  setLoading(true);
+  try {
+    const data = await (await fetch('https://huggingface.co/api/datasets?search='+encodeURIComponent(q)+'&sort='+sort+'&limit=30&full=true')).json();
+    setLoading(false);
+    document.getElementById('results-count').textContent = data.length;
+    drawCards(data.map(d => {
+      let langTag='🌍 Multi'; let hf_lang='multi'; let domTag='Général';
+      if (d.tags) {
+        for (const t of d.tags) { if(t.startsWith('language:')){ hf_lang=t.split(':')[1]; langTag='🌍 '+hf_lang.toUpperCase(); break; } }
+        for (const t of d.tags) { if(t.startsWith('task_categories:')){ domTag=t.split(':')[1].replace(/-/g,' '); break; } }
+      }
+      const dl = d.downloads>=1000 ? Math.floor(d.downloads/1000)+'k' : String(d.downloads||0);
+      return {
+        id: d.id, nom: d.id.split('/').pop(),
+        desc: (d.description||'Dataset sur HuggingFace Hub.').slice(0,200),
+        tagLang: langTag, tagDom: domTag,
+        icon: '🤗', sval: 200, hf_lang, isRaw: true, canDL: true,
+        badge: '<span class="src-badge hf">🤗 HuggingFace</span>',
+        extraTags: ['<span class="tag tag-stat">⬇ '+dl+'</span>'],
+        link: 'https://huggingface.co/datasets/'+d.id,
+      };
+    }));
+  } catch(e) { setLoading(false); showToast('Erreur API HuggingFace','error'); }
+}
+
+// ─── GITHUB API ──────────────────────────────
+async function searchGitHub(q) {
+  setLoading(true);
+  try {
+    const sort = document.getElementById('sort-select').value === 'downloads' ? 'stars' :
+                 document.getElementById('sort-select').value === 'likes' ? 'stars' : 'stars';
+    const url  = 'https://api.github.com/search/repositories?q='+encodeURIComponent(q+' dataset')+'&sort=stars&per_page=30';
+    const res  = await fetch(url, {headers:{'Accept':'application/vnd.github.v3+json'}});
+    if (!res.ok) throw new Error('GitHub API: '+res.status);
+    const data = await res.json();
+    setLoading(false);
+    const items = data.items || [];
+    document.getElementById('results-count').textContent = items.length;
+    if (items.length === 0) {
+      document.getElementById('cards-grid').innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Aucun dépôt trouvé sur GitHub.</p></div>`;
+      return;
+    }
+    drawCards(items.map(r => {
+      const stars = r.stargazers_count >= 1000 ? Math.floor(r.stargazers_count/1000)+'k' : String(r.stargazers_count);
+      const lang  = r.language ? '💻 '+r.language : '📦 Data';
+      return {
+        id: r.full_name, nom: r.name,
+        desc: r.description || 'Dépôt GitHub : '+r.full_name,
+        tagLang: lang, tagDom: r.language || 'Data',
+        icon: '🐙', sval: 200, hf_lang: 'en', isRaw: false, canDL: false,
+        badge: '<span class="src-badge gh">🐙 GitHub</span>',
+        extraTags: ['<span class="tag tag-stat">⭐ '+stars+'</span>'],
+        link: r.html_url,
+      };
+    }));
+  } catch(e) { setLoading(false); showToast('Erreur API GitHub: '+e.message,'error'); }
+}
+
+// ─── PAPERS WITH CODE ────────────────────────
+async function searchPapersWithCode(q) {
+  if (window.location.protocol === 'file:') {
+    document.getElementById('cards-grid').innerHTML = '<div class="empty-state"><div class="icon">📄</div><p>Papers with Code nécessite le serveur Python.<br><small style="color:var(--dim)">Lance <code>python go.py</code> et ouvre la bibliothèque depuis le dashboard.</small></p></div>';
+    document.getElementById('results-count').textContent = '0';
+    setLoading(false);
+    return;
+  }
+  setLoading(true);
+  try {
+    // Proxy via dashboard.py — paperswithcode.com bloque le CORS navigateur
+    const url  = '/api/pwc?q='+encodeURIComponent(q)+'&page_size=30';
+    const data = await (await fetch(url)).json();
+    setLoading(false);
+    const items = data.results || [];
+    document.getElementById('results-count').textContent = items.length;
+    if (items.length === 0) {
+      document.getElementById('cards-grid').innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Aucun dataset trouvé sur Papers with Code.</p></div>`;
+      return;
+    }
+    drawCards(items.map(d => ({
+      id: d.name, nom: d.name,
+      desc: (d.abstract||d.description||'Dataset référencé sur Papers with Code.').slice(0,200),
+      tagLang: '📄 Académique', tagDom: 'Recherche',
+      icon: '📄', sval: 200, hf_lang: 'en', isRaw: false, canDL: false,
+      badge: '<span class="src-badge pw">📄 Papers w/ Code</span>',
+      extraTags: d.paper_count ? ['<span class="tag tag-stat">📄 '+d.paper_count+' papiers</span>'] : [],
+      link: 'https://paperswithcode.com/dataset/'+d.name.toLowerCase().replace(/\s+/g,'-'),
+    })));
+  } catch(e) { setLoading(false); showToast('Erreur API Papers with Code','error'); }
+}
+
+// ─── DRAW CARDS ───────────────────────────────
+function domIcon(d) {
+  return {"Encyclopédie":"📖","Web":"🌐","Littérature":"📚","Programmation":"💻",
+    "Forum":"💬","Science":"🔬","Médecine":"⚕️","Instructions":"🤖",
+    "Dialogues":"🗣️","Traduction":"🔄","Éducation":"🎓","Philosophie":"🧠",
+    "Actualités":"📰","Mathématiques":"🔢"}[d]||"📄";
+}
+
+function drawCards(list) {
+  const grid = document.getElementById('cards-grid');
+  grid.innerHTML = '';
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Aucun dataset trouvé.</p></div>`;
+    return;
+  }
+  list.forEach(d => {
+    const sid  = d.id.replace(/[^a-zA-Z0-9]/g,'_');
+    const card = document.createElement('div');
+    card.className = 'ds-card';
+    const actions = d.canDL ? `
+      <div class="ds-actions">
+        <div class="size-wrap"><input type="number" id="size-${sid}" value="${d.sval}" min="1"><span>Mo</span></div>
+        <button class="dl-btn${serverOnline?'':' offline'}" id="btn-${sid}" onclick="handleDL('${d.id}','${sid}',${d.isRaw},'${d.hf_lang}')" ${serverOnline?'':'disabled title="Lance python go.py pour activer les téléchargements"'}>⬇ Télécharger</button>
+        ${d.link ? `<a class="link-btn" href="${d.link}" target="_blank">↗</a>` : ''}
+      </div>` : `
+      <div class="ds-actions">
+        <a class="link-btn" href="${d.link||'#'}" target="_blank" style="flex:1;justify-content:center;">↗ Voir le projet</a>
+      </div>`;
+    card.innerHTML = `
+      <div class="ds-card-header">
+        <div class="ds-icon">${d.icon}</div>
+        <div class="ds-info">
+          <h3>${d.nom}</h3>
+          <div class="ds-desc">${d.desc}</div>
+        </div>
+      </div>
+      <div class="ds-tags">
+        ${d.badge}
+        <span class="tag tag-lang">${d.tagLang}</span>
+        <span class="tag tag-dom">${d.tagDom}</span>
+        ${d.extraTags.join('')}
+      </div>
+      <div class="progress-bar" id="prog-${sid}"><div class="progress-inner" id="prog-in-${sid}"></div></div>
+      ${actions}`;
+    grid.appendChild(card);
+  });
+}
+
+// ─── DOWNLOAD ────────────────────────────────
+async function handleDL(realId, safeId, isRaw, targetLang) {
+  if (!serverOnline) { showToast('Le serveur Python n\'est pas actif.','error'); return; }
+  const mo     = document.getElementById('size-'+safeId).value||200;
+  const btn    = document.getElementById('btn-'+safeId);
+  const prog   = document.getElementById('prog-'+safeId);
+  const progIn = document.getElementById('prog-in-'+safeId);
+  btn.disabled=true; btn.className='dl-btn downloading'; btn.textContent='⏳ En cours...';
+  prog.classList.add('active'); progIn.style.width='50%';
+  try {
+    const r = await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({dataset_id:realId,mo:parseInt(mo),is_raw_hf:isRaw,lang:targetLang})});
+    if (r.ok) {
+      progIn.style.width='100%'; btn.className='dl-btn done'; btn.textContent='✅ Lancé !';
+      showToast('Téléchargement de '+realId+' ('+mo+' Mo) lancé.','success');
+      setTimeout(()=>{btn.className='dl-btn';btn.textContent='⬇ Télécharger';btn.disabled=false;prog.classList.remove('active');},4000);
+    } else throw new Error('Erreur serveur');
+  } catch(e) {
+    btn.className='dl-btn error'; btn.textContent='❌ Erreur';
+    showToast(e.message,'error');
+    setTimeout(()=>{btn.className='dl-btn';btn.textContent='⬇ Télécharger';btn.disabled=false;prog.classList.remove('active');},3000);
+  }
+}
+
+// ─── UTILS ───────────────────────────────────
+function setLoading(v) {
+  document.getElementById('loader').classList.toggle('visible',v);
+  if (v) document.getElementById('cards-grid').innerHTML='';
+}
+
+async function checkServer() {
+  if (window.location.protocol === 'file:') {
+    if (serverOnline) { serverOnline = false; _updateDlBtns(); }
+    document.getElementById('no-server-banner').classList.add('visible');
+    return;
+  }
+  const wasOnline = serverOnline;
+  try { serverOnline = (await fetch('/api/ping',{signal:AbortSignal.timeout(1500)})).ok; }
+  catch { serverOnline = false; }
+  document.getElementById('no-server-banner').classList.toggle('visible', !serverOnline);
+  if (wasOnline !== serverOnline) _updateDlBtns();
+}
+
+function _updateDlBtns() {
+  document.querySelectorAll('.dl-btn').forEach(function(btn) {
+    if (btn.classList.contains('downloading') || btn.classList.contains('done')) return;
+    if (serverOnline) {
+      btn.classList.remove('offline');
+      btn.disabled = false;
+      btn.title = '';
+    } else {
+      btn.classList.add('offline');
+      btn.disabled = true;
+      btn.title = 'Lance python go.py pour activer les téléchargements';
+    }
+  });
+}
+
+function showToast(msg,type) {
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div'); t.className='toast '+type; t.textContent=msg; c.appendChild(t);
+  setTimeout(()=>t.remove(),4000);
+}
+
+// ─── INIT ────────────────────────────────────
+checkServer();
+setInterval(checkServer, 5000);
+loadLocalData();
+// Init UI state
+document.getElementById('filter-lang').style.display='';
+document.getElementById('filter-domain').style.display='';
+document.getElementById('sort-select').classList.remove('visible');
+</script>
+</body>
+</html>

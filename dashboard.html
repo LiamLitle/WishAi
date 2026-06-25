@@ -1,0 +1,1779 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WishAI Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ══════════════════════════════════════════════
+   VARIABLES
+══════════════════════════════════════════════ */
+:root {
+  --bg0: #0d1117;
+  --bg1: #161b22;
+  --bg2: #21262d;
+  --bg3: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --dim: #484f58;
+  --blue: #58a6ff;
+  --purple: #bc8cff;
+  --green: #3fb950;
+  --yellow: #e3b341;
+  --orange: #f0883e;
+  --red: #f85149;
+}
+
+/* ══════════════════════════════════════════════
+   BASE
+══════════════════════════════════════════════ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg0);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+/* ══════════════════════════════════════════════
+   ÉCRAN IDLE
+══════════════════════════════════════════════ */
+#idle-screen {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: var(--bg0);
+  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+#idle-screen.hidden {
+  opacity: 0;
+  transform: scale(0.97);
+  pointer-events: none;
+}
+
+/* Ambient glow background */
+#idle-screen .idle-glow {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 30%, rgba(88,166,255,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 80% 70%, rgba(188,140,255,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 50% 50%, rgba(63,185,80,0.04) 0%, transparent 60%);
+  animation: idleBgPulse 6s ease-in-out infinite alternate;
+}
+@keyframes idleBgPulse {
+  0%   { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Moving grid */
+#idle-screen .idle-grid {
+  position: absolute; inset: -40px; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(88,166,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(88,166,255,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: gridDrift 18s linear infinite;
+}
+@keyframes gridDrift { 0%{transform:translateY(0)} 100%{transform:translateY(40px)} }
+
+/* Floating particles container */
+.idle-dots { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.idle-dot {
+  position: absolute; border-radius: 50%; opacity: 0;
+  animation: floatDot linear infinite;
+}
+@keyframes floatDot {
+  0%   { opacity: 0; transform: translateY(105vh) scale(0); }
+  8%   { opacity: 0.5; }
+  92%  { opacity: 0.15; }
+  100% { opacity: 0; transform: translateY(-50px) scale(1.2); }
+}
+
+/* Brain */
+.idle-brain {
+  font-size: 5rem; position: relative; z-index: 1;
+  animation: brainFloat 3.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 24px rgba(88,166,255,0.35));
+}
+@keyframes brainFloat {
+  0%,100% { transform: translateY(0) rotate(-1deg);  filter: drop-shadow(0 0 18px rgba(88,166,255,0.3)); }
+  50%      { transform: translateY(-14px) rotate(2deg); filter: drop-shadow(0 0 36px rgba(188,140,255,0.5)); }
+}
+
+.idle-title {
+  font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em;
+  background: linear-gradient(90deg, var(--blue), var(--purple), var(--blue));
+  background-size: 200% auto;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: titleShine 3s linear infinite;
+  position: relative; z-index: 1;
+}
+@keyframes titleShine {
+  0%   { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+.idle-subtitle { color: var(--muted); font-size: 1.05rem; position: relative; z-index: 1; }
+
+.idle-cmd {
+  font-family: 'Consolas', monospace; font-size: 1rem;
+  background: var(--bg1); border: 1px solid var(--bg3); border-radius: 8px;
+  padding: 10px 22px; color: var(--green); letter-spacing: 0.04em;
+  position: relative; z-index: 1;
+  box-shadow: 0 0 24px rgba(63,185,80,0.1), inset 0 0 0 1px rgba(63,185,80,0.05);
+  transition: box-shadow 0.3s;
+}
+.idle-cmd:hover { box-shadow: 0 0 32px rgba(63,185,80,0.2), inset 0 0 0 1px rgba(63,185,80,0.1); }
+.idle-cmd::before { content: '$ '; color: var(--dim); }
+
+.idle-pulse {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--dim); font-size: 0.85rem;
+  position: relative; z-index: 1;
+}
+.idle-pulse-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--blue);
+  animation: idleDot 2.2s ease-in-out infinite;
+}
+@keyframes idleDot {
+  0%,100% { opacity: 0.15; transform: scale(0.9); box-shadow: 0 0 4px var(--blue); }
+  50%      { opacity: 1;    transform: scale(1.4); box-shadow: 0 0 16px var(--blue); }
+}
+
+/* ══════════════════════════════════════════════
+   BANNIÈRE TERMINÉ
+══════════════════════════════════════════════ */
+#done-banner {
+  display: none;
+  background: linear-gradient(90deg, #0f1e11, #0d1631);
+  border-bottom: 2px solid var(--green);
+  padding: 14px 24px;
+  align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+}
+#done-banner.show {
+  display: flex;
+  animation: bannerSlide 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes bannerSlide {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+.done-icon  { font-size: 1.4rem; }
+.done-label { font-size: 1rem; font-weight: 700; color: var(--green); }
+.done-stats { display: flex; gap: 24px; flex-wrap: wrap; }
+.done-stat  { font-size: 0.8rem; color: var(--muted); }
+.done-stat b { color: var(--text); }
+
+/* ══════════════════════════════════════════════
+   DASHBOARD PRINCIPAL
+══════════════════════════════════════════════ */
+#dashboard { padding: 20px; display: none; }
+#dashboard.show {
+  display: block;
+  animation: dashIn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes dashIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Header ── */
+.db-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+  padding-bottom: 16px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--bg2);
+  position: relative;
+}
+/* Animated gradient line under header */
+.db-header::after {
+  content: '';
+  position: absolute; bottom: -1px; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--blue), var(--purple), transparent);
+  background-size: 200% auto;
+  animation: headerLine 4s linear infinite;
+}
+@keyframes headerLine {
+  0%   { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+.db-header-left  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.db-header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ── Badges ── */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 0.78rem; font-weight: 600; border: 1px solid;
+  white-space: nowrap;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
+}
+.badge:hover { transform: translateY(-2px); }
+.b-model   { background:#161f2e; border-color:#58a6ff44; color:var(--blue); }
+.b-model:hover   { box-shadow: 0 4px 14px rgba(88,166,255,0.2); }
+.b-preset  { background:#1d1633; border-color:#bc8cff44; color:var(--purple); }
+.b-preset:hover  { box-shadow: 0 4px 14px rgba(188,140,255,0.2); }
+.b-mode-auto     { background:#122110; border-color:#3fb95044; color:var(--green); }
+.b-mode-time     { background:#201900; border-color:#e3b34144; color:var(--yellow); }
+.b-gpu    { background:#1a1a1a; border-color:var(--bg3); color:var(--muted); font-size:0.73rem; }
+.b-clock  { background:#1a1a1a; border-color:var(--bg3); color:var(--muted); font-size:0.73rem; }
+
+/* ── Statut pill ── */
+.status-pill {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 16px; border-radius: 20px;
+  background: var(--bg1); border: 1px solid var(--bg3);
+  transition: box-shadow 0.4s ease;
+}
+.status-pill:has(.s-running) {
+  border-color: rgba(63,185,80,0.3);
+  box-shadow: 0 0 14px rgba(63,185,80,0.12);
+}
+.s-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; position: relative; }
+
+/* Running dot with concentric ring pulse */
+.s-running { background: var(--green); }
+.s-running::before {
+  content: '';
+  position: absolute; inset: -4px; border-radius: 50%;
+  border: 1.5px solid var(--green);
+  opacity: 0;
+  animation: ring1 1.8s ease-out infinite;
+}
+.s-running::after {
+  content: '';
+  position: absolute; inset: -8px; border-radius: 50%;
+  border: 1px solid var(--green);
+  opacity: 0;
+  animation: ring1 1.8s ease-out 0.4s infinite;
+}
+@keyframes ring1 {
+  0%   { opacity: 0.7; transform: scale(0.4); }
+  100% { opacity: 0;   transform: scale(1.8); }
+}
+
+.s-done     { background: var(--green); }
+.s-converge { background: var(--blue); }
+.s-paused   { background: var(--yellow); animation: srun 0.7s infinite; }
+@keyframes srun { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.s-label { font-size: 0.82rem; font-weight: 600; }
+
+/* ── Grilles ── */
+.g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:14px; }
+.g3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:14px; }
+.g2 { display:grid; grid-template-columns:1fr 1fr;       gap:14px; margin-bottom:14px; }
+@media(max-width:1100px){ .g4{grid-template-columns:1fr 1fr} }
+@media(max-width:800px) { .g3,.g2{grid-template-columns:1fr} }
+@media(max-width:600px) { .g4{grid-template-columns:1fr} }
+
+/* ── Carte ── */
+.card {
+  background: var(--bg1); border: 1px solid var(--bg3); border-radius: 12px; padding: 18px;
+  position: relative; overflow: hidden;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, border-color 0.25s;
+  animation: cardIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+}
+/* Shine sweep on hover */
+.card::before {
+  content: '';
+  position: absolute; top: 0; left: -120%; width: 70%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.035), transparent);
+  transition: left 0.55s ease;
+  pointer-events: none; z-index: 0;
+}
+.card:hover::before { left: 160%; }
+
+/* Staggered delays for metric rows */
+.g4 > .card:nth-child(1) { animation-delay: 0.04s; }
+.g4 > .card:nth-child(2) { animation-delay: 0.09s; }
+.g4 > .card:nth-child(3) { animation-delay: 0.14s; }
+.g4 > .card:nth-child(4) { animation-delay: 0.19s; }
+.g2 > .card:nth-child(1) { animation-delay: 0.09s; }
+.g2 > .card:nth-child(2) { animation-delay: 0.14s; }
+
+/* Accent left-border avec inner glow */
+.card.al-purple { border-left: 3px solid #bc8cff; }
+.card.al-blue   { border-left: 3px solid #58a6ff; }
+.card.al-green  { border-left: 3px solid #3fb950; }
+.card.al-yellow { border-left: 3px solid #e3b341; }
+.card.al-orange { border-left: 3px solid #f0883e; }
+.card.al-red    { border-left: 3px solid #f85149; }
+
+/* Glow renforcé sur hover selon couleur */
+.card.al-purple:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.4), -3px 0 20px rgba(188,140,255,0.15) inset; border-left-color: #d2a8ff; }
+.card.al-blue:hover   { box-shadow: 0 8px 28px rgba(0,0,0,0.4), -3px 0 20px rgba(88,166,255,0.15) inset;  border-left-color: #79c0ff; }
+.card.al-green:hover  { box-shadow: 0 8px 28px rgba(0,0,0,0.4), -3px 0 20px rgba(63,185,80,0.15) inset;   border-left-color: #56d364; }
+.card.al-yellow:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.4), -3px 0 20px rgba(227,179,65,0.12) inset;  }
+.card.al-orange:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.4), -3px 0 20px rgba(240,136,62,0.12) inset;  }
+.card.al-red:hover    { box-shadow: 0 8px 28px rgba(0,0,0,0.4), -3px 0 20px rgba(248,81,73,0.12) inset;    }
+
+.card-title { font-size: 0.71rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 10px; position: relative; z-index: 1; }
+
+/* ── Valeur métrique ── */
+.mval {
+  font-size: 2rem; font-weight: 700; line-height: 1;
+  transition: color 0.35s ease;
+  position: relative; z-index: 1;
+}
+.mval.bump { animation: valBump 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes valBump {
+  0%,100% { transform: scale(1); }
+  45%     { transform: scale(1.07); }
+}
+.msub { font-size: 0.74rem; color: var(--muted); margin-top: 5px; position: relative; z-index: 1; }
+.mtag {
+  display: inline-block; margin-top: 6px; padding: 2px 9px;
+  border-radius: 10px; font-size: 0.68rem; font-weight: 600; border: 1px solid;
+  position: relative; z-index: 1;
+}
+
+/* Couleurs */
+.cg { color:var(--green); }  .cy { color:var(--yellow); } .co { color:var(--orange); }
+.cr { color:var(--red); }    .cb { color:var(--blue); }   .cw { color:var(--text); }
+.tg { background:#0f1e11; border-color:#3fb95044; color:var(--green); }
+.ty { background:#201900; border-color:#e3b34144; color:var(--yellow); }
+.to { background:#1e1200; border-color:#f0883e44; color:var(--orange); }
+.tr { background:#1e0f0f; border-color:#f8514944; color:var(--red); }
+.tb { background:#0d1631; border-color:#58a6ff44; color:var(--blue); }
+
+/* ── Barre de progression ── */
+.prog-card { margin-bottom: 14px; }
+.prog-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.prog-head .left  { font-size:0.82rem; font-weight:600; }
+.prog-head .right { font-size:0.75rem; color:var(--muted); }
+.prog-track { background:var(--bg2); border-radius:8px; height:14px; overflow:hidden; position:relative; }
+.prog-fill {
+  height:100%; border-radius:8px;
+  background: linear-gradient(90deg, #1f6feb, var(--blue), var(--purple));
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  width: 0%; position: relative; overflow: hidden;
+}
+/* Shimmer sweep */
+.prog-fill::after {
+  content: '';
+  position: absolute; top: 0; left: -100%; width: 80%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
+  animation: progShimmer 2.2s ease-in-out infinite;
+}
+@keyframes progShimmer {
+  0%   { left: -100%; }
+  100% { left: 200%; }
+}
+.prog-fill.ind { width:22% !important; animation: indAnim 1.8s linear infinite; }
+.prog-fill.ind::after { display:none; }
+@keyframes indAnim { 0%{transform:translateX(-100%)} 100%{transform:translateX(500%)} }
+.prog-foot { display:flex; justify-content:space-between; margin-top:5px; font-size:0.71rem; color:var(--dim); }
+
+/* ── Jauges mémoire ── */
+.gauge-wrap { margin-top: 9px; }
+.gauge-lbl  { display:flex; justify-content:space-between; font-size:0.72rem; color:var(--muted); margin-bottom:4px; }
+.gauge-track { background:var(--bg2); border-radius:6px; height:8px; overflow:hidden; position:relative; }
+.gauge-fill  {
+  height:100%; border-radius:6px;
+  transition: width 0.75s cubic-bezier(0.34, 1.15, 0.64, 1), background 0.4s ease;
+  background: var(--green);
+}
+.gauge-fill.gw { background:var(--yellow); }
+.gauge-fill.gd { background:var(--red); }
+.gauge-lim   { position:absolute; top:0; bottom:0; width:2px; background:rgba(248,81,73,0.6); }
+.gauge-hint  { font-size:0.63rem; color:var(--dim); margin-top:4px; }
+.alertbox { display:none; margin-top:8px; padding:6px 10px; border-radius:6px; font-size:0.74rem; font-weight:600; }
+.alertbox.on {
+  display:block;
+  animation: alertPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes alertPop {
+  from { transform: scale(0.88); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+.ab-danger { background:#1e0f0f; border:1px solid var(--red);    color:var(--red); }
+.ab-warn   { background:#201900; border:1px solid var(--yellow); color:var(--yellow); }
+
+/* ── Échelle perplexité ── */
+.perp-scale { display:flex; gap:5px; margin-top:10px; }
+.ps {
+  flex:1; padding:4px 4px; border-radius:5px; text-align:center;
+  font-size:0.6rem; font-weight:600; line-height:1.4;
+  opacity:0.2; border:1px solid transparent;
+  transition: opacity 0.45s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ps.on { opacity:1; transform: scale(1.07); }
+.ps1 { background:#1e0f0f; border-color:var(--red);    color:var(--red); }
+.ps2 { background:#201900; border-color:var(--yellow); color:var(--yellow); }
+.ps3 { background:#151a00; border-color:#8ac926; color:#8ac926; }
+.ps4 { background:#0f1e11; border-color:var(--green);  color:var(--green); }
+
+/* ── Graphique ── */
+.chart-wrap { position:relative; height:260px; }
+
+/* ── Grille hyperparamètres ── */
+.param-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(115px,1fr)); gap:8px; }
+.param-item {
+  background: var(--bg0); border: 1px solid var(--bg2); border-radius: 8px; padding: 10px 12px;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s, box-shadow 0.2s;
+  animation: cardIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.param-item:hover {
+  transform: translateY(-2px) scale(1.02);
+  border-color: var(--bg3);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+}
+.pi-label { font-size:0.67rem; color:var(--muted); margin-bottom:3px; }
+.pi-val   { font-size:1rem; font-weight:700; color:var(--purple); }
+.pi-desc  { font-size:0.61rem; color:var(--dim); margin-top:2px; }
+
+/* ── Architecture ── */
+.arch { display:flex; flex-direction:column; gap:5px; align-items:center; }
+.ab {
+  width:100%; max-width:310px; padding:7px 12px; border-radius:7px;
+  text-align:center; font-size:0.76rem; font-weight:600; border:1px solid;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
+}
+.ab:hover { transform: scale(1.025); }
+.ab-in  { background:#0f1e11; border-color:var(--green);  color:var(--green); }
+.ab-em  { background:#0d1631; border-color:var(--blue);   color:var(--blue); }
+.ab-at  { background:#180f2b; border-color:var(--purple); color:var(--purple); }
+.ab-ff  { background:#180f2b; border-color:#d2a8ff; color:#d2a8ff; }
+.ab-nm  { background:var(--bg1); border-color:var(--dim); color:var(--muted); }
+.ab-out { background:#1e0f0f; border-color:var(--red); color:var(--red); }
+.arch-arr  { color:var(--dim); text-align:center; font-size:1rem; }
+.arch-loop { font-size:0.62rem; color:var(--muted); border:1px dashed var(--bg3); border-radius:5px; padding:2px 10px; }
+
+/* ── Texte généré ── */
+#gen-text {
+  font-family:'Consolas',monospace; font-size:0.79rem; color:#79c0ff;
+  background:var(--bg0); border:1px solid var(--bg2); border-radius:8px;
+  padding:12px; min-height:46px; max-height:80px; overflow:hidden;
+  white-space:pre-wrap; word-break:break-word; line-height:1.6;
+  transition: max-height 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+#gen-text.exp { max-height:none; }
+
+/* ── Flash nouveau record ── */
+@keyframes flashRecord {
+  0%   { border-color:var(--bg3);   box-shadow: 0 0 0 0 rgba(63,185,80,0); }
+  20%  { border-color:var(--green); box-shadow: 0 0 0 4px rgba(63,185,80,0.25), -3px 0 18px rgba(63,185,80,0.25) inset; }
+  50%  { border-color:var(--blue);  box-shadow: 0 0 0 6px rgba(88,166,255,0.18), -3px 0 18px rgba(88,166,255,0.18) inset; }
+  80%  { border-color:var(--green); box-shadow: 0 0 0 4px rgba(63,185,80,0.2),  -3px 0 16px rgba(63,185,80,0.2) inset; }
+  100% { border-color:var(--bg3);   box-shadow: 0 0 0 0 rgba(63,185,80,0); }
+}
+.flashing { animation: flashRecord 0.9s ease 3; }
+
+/* ── Footer ── */
+.refresh-info { text-align:right; font-size:0.69rem; color:var(--dim); margin-top:12px; }
+
+/* ══════════════════════════════════════════════
+   SECTIONS COLLAPSIBLES
+══════════════════════════════════════════════ */
+.coll-section { margin-bottom: 14px; }
+.coll-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; user-select: none; padding: 10px 16px;
+  background: var(--bg1); border-radius: 10px; border: 1px solid var(--bg3);
+  transition: background 0.15s;
+}
+.coll-hdr:hover { background: var(--bg2); }
+.coll-title { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+.coll-subtitle { font-size: 0.72rem; color: var(--muted); margin-left: 8px; }
+.coll-toggle { color: var(--muted); font-size: 0.8rem; transition: transform 0.25s; }
+.coll-toggle.closed { transform: rotate(-90deg); }
+.coll-body {
+  overflow: hidden; max-height: 2000px;
+  transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s;
+  opacity: 1; padding-top: 6px;
+}
+.coll-body.closed { max-height: 0; opacity: 0; pointer-events: none; }
+.info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.info-cell {
+  background: var(--bg1); border-radius: 8px; padding: 11px 13px;
+  border: 1px solid var(--bg3);
+}
+.info-label { font-size: 0.67rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+.info-val { font-size: 1.05rem; font-weight: 700; color: var(--text); line-height: 1.2; }
+.info-sub  { font-size: 0.68rem; color: var(--dim); margin-top: 3px; }
+.trend-good    { color: var(--green) !important; }
+.trend-warn    { color: var(--yellow) !important; }
+.trend-bad     { color: var(--red) !important; }
+.trend-neutral { color: var(--muted) !important; }
+.event-log { padding: 4px 0; }
+.event-item {
+  display: flex; gap: 12px; align-items: baseline;
+  padding: 6px 2px; border-bottom: 1px solid var(--bg3); font-size: 0.77rem;
+}
+.event-item:last-child { border-bottom: none; }
+.event-step { color: var(--dim); min-width: 80px; flex-shrink: 0; }
+.event-ico  { flex-shrink: 0; }
+.event-text { color: var(--text); }
+
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════
+     ÉCRAN D'ATTENTE
+══════════════════════════════════════════════════════════════ -->
+<div id="idle-screen">
+  <div class="idle-glow"></div>
+  <div class="idle-grid"></div>
+  <div class="idle-dots" id="idle-dots"></div>
+
+  <div class="idle-brain">🧠</div>
+  <div class="idle-title">WishAI Dashboard</div>
+  <div class="idle-subtitle">Aucun entraînement en cours</div>
+  <div class="idle-cmd">python go.py</div>
+  <div class="idle-pulse">
+    <div class="idle-pulse-dot"></div>
+    En attente du démarrage de l'entraînement...
+  </div>
+  <a href="library.html" style="margin-top:8px;display:inline-flex;align-items:center;gap:8px;padding:10px 22px;background:rgba(88,166,255,0.12);border:1px solid rgba(88,166,255,0.3);border-radius:10px;color:#58a6ff;font-size:0.9rem;font-weight:600;text-decoration:none;transition:all .2s;" onmouseover="this.style.background='rgba(88,166,255,0.22)'" onmouseout="this.style.background='rgba(88,166,255,0.12)'">
+    📚 Ouvrir la Bibliothèque de Données
+  </a>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     BANNIÈRE : TERMINÉ / CONVERGENCE
+══════════════════════════════════════════════════════════════ -->
+<div id="done-banner">
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="done-icon" id="done-icon">✅</span>
+    <span class="done-label" id="done-label">Entraînement terminé !</span>
+  </div>
+  <div class="done-stats">
+    <div class="done-stat">Modèle : <b id="dn-model">—</b></div>
+    <div class="done-stat">Val Loss finale : <b id="dn-val">—</b></div>
+    <div class="done-stat">Étapes : <b id="dn-steps">—</b></div>
+    <div class="done-stat">Durée : <b id="dn-duree">—</b></div>
+    <div class="done-stat">Preset : <b id="dn-preset">—</b></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     DASHBOARD
+══════════════════════════════════════════════════════════════ -->
+<div id="dashboard">
+
+  <!-- ── HEADER ── -->
+  <div class="db-header">
+    <div class="db-header-left">
+      <div class="badge b-model"    id="b-model">🤖 —</div>
+      <div class="badge b-preset"   id="b-preset">— —</div>
+      <div class="badge b-mode-auto" id="b-mode">⚙️ —</div>
+    </div>
+    <div class="status-pill">
+      <div class="s-dot s-running" id="s-dot"></div>
+      <div class="s-label" id="s-label">En cours...</div>
+    </div>
+    <div class="db-header-right">
+      <div class="badge b-gpu"   id="b-gpu">🎮 —</div>
+      <div class="badge b-clock" id="b-clock">🕐 —</div>
+    </div>
+  </div>
+
+  <!-- ── MÉTRIQUES PRINCIPALES ── -->
+  <div class="g4">
+    <div class="card al-purple">
+      <div class="card-title">Val Loss</div>
+      <div class="mval cw" id="val-loss">—</div>
+      <div class="msub">Données jamais vues · le + important</div>
+      <div class="mtag tb" id="val-tag" style="display:none"></div>
+    </div>
+    <div class="card al-blue">
+      <div class="card-title">Train Loss</div>
+      <div class="mval cw" id="train-loss">—</div>
+      <div class="msub">Données d'entraînement</div>
+      <div class="mtag tb" id="train-tag" style="display:none"></div>
+    </div>
+    <div class="card al-green">
+      <div class="card-title">Vitesse</div>
+      <div class="mval cg" id="speed-val">—</div>
+      <div class="msub">itérations / seconde</div>
+      <div class="mtag tb" id="device-tag">—</div>
+    </div>
+    <div class="card al-yellow">
+      <div class="card-title">Learning Rate</div>
+      <div class="mval cw" id="lr-val">—</div>
+      <div class="msub" id="lr-sub">Taux d'apprentissage actuel</div>
+    </div>
+  </div>
+
+  <!-- ── MÉTRIQUES SECONDAIRES ── -->
+  <div class="g4">
+    <div class="card al-yellow">
+      <div class="card-title">Temps restant</div>
+      <div class="mval cy" id="eta-val">—</div>
+      <div class="msub" id="eta-sub">Fin prévue : —</div>
+    </div>
+    <div class="card al-orange">
+      <div class="card-title">Perplexité</div>
+      <div class="mval cw" id="perp-val">—</div>
+      <div class="msub">e^(val_loss) · plus bas = meilleur</div>
+      <div class="perp-scale">
+        <div class="ps ps1" id="ps1">&gt;100<br>Début</div>
+        <div class="ps ps2" id="ps2">20–100<br>Moyen</div>
+        <div class="ps ps3" id="ps3">5–20<br>Bon</div>
+        <div class="ps ps4" id="ps4">&lt;5<br>Top</div>
+      </div>
+    </div>
+    <div class="card al-green" id="best-card">
+      <div class="card-title">🏆 Meilleure Val Loss</div>
+      <div class="mval cg" id="best-val">—</div>
+      <div class="msub" id="best-step">à l'étape —</div>
+      <div class="mtag tg" id="record-tag" style="display:none">🎉 Nouveau record !</div>
+    </div>
+    <div class="card al-purple">
+      <div class="card-title">Overfitting Gap</div>
+      <div class="mval cw" id="gap-val">—</div>
+      <div class="msub">Val − Train · idéal ≈ 0</div>
+      <div class="mtag" id="gap-tag" style="display:none"></div>
+    </div>
+    <div class="card al-blue">
+      <div class="card-title">Tokens traités</div>
+      <div class="mval cb" id="tok-val">—</div>
+      <div class="msub" id="tok-sub">—</div>
+    </div>
+  </div>
+
+  <!-- ── PROGRESSION ── -->
+  <div class="card prog-card">
+    <div class="prog-head">
+      <div class="left">
+        Étape&nbsp;<span id="iter-cur">0</span>
+        <span id="iter-max" style="color:var(--muted)">&nbsp;/ —</span>
+      </div>
+      <div class="right" id="elapsed">—</div>
+    </div>
+    <div class="prog-track">
+      <div class="prog-fill" id="prog-fill"></div>
+    </div>
+    <div class="prog-foot">
+      <span id="prog-pct">0%</span>
+      <span id="prog-eta">—</span>
+    </div>
+  </div>
+
+  <!-- ── MÉMOIRE & SYSTÈME ── -->
+  <div class="g4">
+
+    <!-- VRAM -->
+    <div class="card">
+      <div class="card-title">🎮 VRAM GPU</div>
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <div class="mval cw" id="vram-val">—</div>
+        <div class="msub" id="vram-total" style="margin:0">/ — Go</div>
+      </div>
+      <div class="gauge-wrap">
+        <div class="gauge-lbl"><span>Utilisation</span><span id="vram-pct">—</span></div>
+        <div class="gauge-track">
+          <div class="gauge-fill" id="vram-bar" style="width:0%"></div>
+          <div class="gauge-lim"  id="vram-lim"  style="left:83%"></div>
+        </div>
+      </div>
+      <div class="gauge-hint" id="vram-hint">🔴 Arrêt auto à — Go</div>
+      <div class="alertbox ab-danger" id="vram-alert">🚨 VRAM critique — arrêt automatique !</div>
+    </div>
+
+    <!-- RAM -->
+    <div class="card">
+      <div class="card-title">💾 RAM Système</div>
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <div class="mval cw" id="ram-val">—</div>
+        <div class="msub" id="ram-total" style="margin:0">/ — Go</div>
+      </div>
+      <div class="gauge-wrap">
+        <div class="gauge-lbl"><span>Utilisation</span><span id="ram-pct">—</span></div>
+        <div class="gauge-track">
+          <div class="gauge-fill" id="ram-bar" style="width:0%"></div>
+          <div class="gauge-lim"  id="ram-lim"  style="left:80%"></div>
+        </div>
+      </div>
+      <div class="gauge-hint" id="ram-hint">🔴 Arrêt auto à — Go</div>
+      <div class="alertbox ab-danger" id="ram-alert">⚠️ RAM critique — ferme d'autres apps !</div>
+    </div>
+
+    <!-- CPU -->
+    <div class="card">
+      <div class="card-title">🔲 CPU</div>
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <div class="mval cw" id="cpu-val">—</div>
+        <div class="msub" style="margin:0">%</div>
+      </div>
+      <div class="gauge-wrap">
+        <div class="gauge-lbl"><span>Charge</span><span id="cpu-pct">—</span></div>
+        <div class="gauge-track">
+          <div class="gauge-fill" id="cpu-bar" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="gauge-hint">Processeur principal</div>
+    </div>
+
+    <!-- Température GPU -->
+    <div class="card al-red">
+      <div class="card-title">🌡️ Température GPU</div>
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <div class="mval cw" id="temp-val">—</div>
+        <div class="msub" style="margin:0">°C</div>
+      </div>
+      <div class="gauge-wrap">
+        <div class="gauge-lbl"><span id="temp-status">—</span><span id="temp-pct">—</span></div>
+        <div class="gauge-track">
+          <div class="gauge-fill" id="temp-bar" style="width:0%"></div>
+          <div class="gauge-lim" style="left:87%"></div>
+        </div>
+      </div>
+      <div class="gauge-hint">Ralenti ≥ 80°C · Pause ≥ 87°C</div>
+      <div class="alertbox ab-warn"   id="temp-warn">🟠 GPU chaud — ralentissement actif</div>
+      <div class="alertbox ab-danger" id="temp-crit">🌡️ Surchauffe — pause thermique !</div>
+    </div>
+
+  </div>
+
+  <!-- ── GRAPHIQUE PERTES ── -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+      <span>Courbes de perte &nbsp;·&nbsp; Train <span style="color:#58a6ff">━━</span> &nbsp;Val <span style="color:#bc8cff">╌╌</span></span>
+      <button onclick="toggleCompare()" id="btn-compare"
+        style="background:#21262d;border:1px solid #30363d;color:#8b949e;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:12px">
+        Comparer les modèles
+      </button>
+    </div>
+    <div class="chart-wrap"><canvas id="loss-chart"></canvas></div>
+  </div>
+
+  <!-- ── PANNEAU COMPARAISON ── -->
+  <div id="compare-panel" style="display:none" class="card" style="margin-bottom:14px">
+    <div class="card-title" style="margin-bottom:10px;display:flex;justify-content:space-between">
+      <span>Comparaison multi-modèles</span>
+      <button onclick="toggleCompare()" style="background:none;border:none;color:#8b949e;cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div id="compare-status" style="color:#8b949e;font-size:13px;margin-bottom:8px"></div>
+    <div class="chart-wrap"><canvas id="compare-chart"></canvas></div>
+  </div>
+
+
+  <!-- ── SECTIONS DÉTAILS (COLLAPSIBLES) ── -->
+
+  <!-- Tendances & Convergence -->
+  <div class="coll-section">
+    <div class="coll-hdr" onclick="toggleSection('trend')">
+      <span><span class="coll-title">📈 Tendances &amp; Convergence</span><span class="coll-subtitle">Vitesse de descente, plateau estimé</span></span>
+      <span class="coll-toggle" id="toggle-trend">▾</span>
+    </div>
+    <div class="coll-body" id="body-trend">
+      <div class="info-grid">
+        <div class="info-cell">
+          <div class="info-label">Δ Val Loss (10 évals)</div>
+          <div class="info-val" id="delta-val">—</div>
+          <div class="info-sub" id="delta-sub">—</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">Tendance</div>
+          <div class="info-val" id="trend-txt">—</div>
+          <div class="info-sub" id="trend-sub">—</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">Δ loss / 100 étapes</div>
+          <div class="info-val" id="descent-rate">—</div>
+          <div class="info-sub">vitesse de descente</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">Plateau (Julia AI)</div>
+          <div class="info-val" id="plateau-est">—</div>
+          <div class="info-sub" id="plateau-sub">étapes</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">Overfitting (Chinchilla)</div>
+          <div class="info-val" id="chinchilla-risque">—</div>
+          <div class="info-sub" id="chinchilla-sub">Ratio params/tokens</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Performance réelle -->
+  <div class="coll-section">
+    <div class="coll-hdr" onclick="toggleSection('perf')">
+      <span><span class="coll-title">⚡ Performance réelle</span><span class="coll-subtitle">Tokens/s, données traitées, checkpoints</span></span>
+      <span class="coll-toggle" id="toggle-perf">▾</span>
+    </div>
+    <div class="coll-body" id="body-perf">
+      <div class="info-grid">
+        <div class="info-cell">
+          <div class="info-label">Tokens / seconde</div>
+          <div class="info-val" id="toks-s">—</div>
+          <div class="info-sub">batch × block × vitesse</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">Données traitées</div>
+          <div class="info-val" id="data-mo">—</div>
+          <div class="info-sub">Mo de texte vus</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">Batch effectif</div>
+          <div class="info-val" id="eff-batch">—</div>
+          <div class="info-sub">batch × grad_accum</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">Checkpoints</div>
+          <div class="info-val" id="ckpt-count">—</div>
+          <div class="info-sub" id="ckpt-sub">sauvegardes créées</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Analyse du modèle -->
+  <div class="coll-section">
+    <div class="coll-hdr" onclick="toggleSection('modinfo')">
+      <span><span class="coll-title">🧠 Analyse du modèle</span><span class="coll-subtitle">Params par couche, VRAM théorique, état</span></span>
+      <span class="coll-toggle" id="toggle-modinfo">▾</span>
+    </div>
+    <div class="coll-body" id="body-modinfo">
+      <div class="info-grid">
+        <div class="info-cell">
+          <div class="info-label">Params / couche</div>
+          <div class="info-val" id="params-per-layer">—</div>
+          <div class="info-sub">12 × n_embd²</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">VRAM théorique</div>
+          <div class="info-val" id="vram-theory">—</div>
+          <div class="info-sub">~4 octets / param</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">Head size</div>
+          <div class="info-val" id="head-size">—</div>
+          <div class="info-sub">n_embd ÷ n_head</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">État apprentissage</div>
+          <div class="info-val" id="learn-state">—</div>
+          <div class="info-sub" id="learn-sub">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Journal des événements -->
+  <div class="coll-section">
+    <div class="coll-hdr" onclick="toggleSection('journal')">
+      <span><span class="coll-title">📋 Journal des événements</span><span class="coll-subtitle">Records, pauses, alertes</span></span>
+      <span class="coll-toggle" id="toggle-journal">▾</span>
+    </div>
+    <div class="coll-body" id="body-journal">
+      <div class="event-log" id="event-log">
+        <div class="event-item"><span class="event-step">—</span><span class="event-text">Aucun événement pour l'instant</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── HYPERPARAMÈTRES + ARCHITECTURE ── -->
+  <div class="g2">
+    <div class="card">
+      <div class="card-title">Hyperparamètres</div>
+      <div class="param-grid" id="param-grid">
+        <div style="color:var(--dim);font-size:0.8rem;grid-column:1/-1">En attente...</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Architecture du modèle</div>
+      <div class="arch">
+        <div class="ab ab-in">Tokens d'entrée (BPE)</div>
+        <div class="arch-arr">↓</div>
+        <div class="ab ab-em">Token Embedding (RoPE dans l'attention)</div>
+        <div class="arch-arr">↓</div>
+        <div class="arch-loop" id="arch-loop">× N blocs Transformer</div>
+        <div class="ab ab-nm">RMSNorm</div>
+        <div class="ab ab-at">Multi-Head Self-Attention + RoPE</div>
+        <div class="ab ab-nm">+ Residual</div>
+        <div class="ab ab-nm">RMSNorm</div>
+        <div class="ab ab-ff">SwiGLU Feed-Forward (8/3 × dim)</div>
+        <div class="ab ab-nm">+ Residual</div>
+        <div class="arch-arr">↓</div>
+        <div class="ab ab-out">RMSNorm → Linear → Softmax → Token prédit</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TEXTE GÉNÉRÉ ── -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div class="card-title" style="margin:0">Dernier texte généré par le modèle</div>
+      <button id="gen-btn" onclick="toggleGen()"
+        style="background:var(--bg2);border:1px solid var(--bg3);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:0.72rem;cursor:pointer;transition:background 0.2s,color 0.2s"
+        onmouseover="this.style.background='#2d333b';this.style.color='#e6edf3'"
+        onmouseout="this.style.background='var(--bg2)';this.style.color='var(--muted)'">
+        ↕ Voir tout
+      </button>
+    </div>
+    <div id="gen-text">Le modèle n'a pas encore généré de texte...</div>
+  </div>
+
+  <div class="refresh-info">
+    Actualisation toutes les 3 s &nbsp;·&nbsp; Dernier refresh : <span id="last-ref">—</span>
+  </div>
+
+</div><!-- /dashboard -->
+
+<!-- ══════════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════════ -->
+<script>
+// ─── AUTO-REDIRECT file:// → localhost ─────────────────────────────
+(function() {
+  if (window.location.protocol === 'http:') {
+    try { localStorage.setItem('wishai_port', window.location.port); } catch(e) {}
+    return;
+  }
+  if (window.location.protocol !== 'file:') return;
+  const _p = localStorage.getItem('wishai_port');
+  if (!_p) return;
+  fetch('http://localhost:' + _p + '/api/ping', {mode:'no-cors', signal:AbortSignal.timeout(1000)})
+    .then(function() { window.location.replace('http://localhost:' + _p + '/dashboard.html'); })
+    .catch(function() {});
+})();
+
+// ── Particules idle ────────────────────────────────────────────────
+(function() {
+  const container = document.getElementById('idle-dots');
+  for (let i = 0; i < 22; i++) {
+    const d = document.createElement('div');
+    d.className = 'idle-dot';
+    const size = Math.random() * 4 + 2;
+    const colors = ['#58a6ff', '#bc8cff', '#3fb950'];
+    const color  = colors[Math.floor(Math.random() * colors.length)];
+    d.style.cssText = [
+      `width:${size}px`, `height:${size}px`,
+      `left:${Math.random() * 100}%`,
+      `animation-duration:${Math.random() * 9 + 7}s`,
+      `animation-delay:${Math.random() * 12}s`,
+      `background:${color}`,
+      `filter:blur(${Math.random() > 0.5 ? 1 : 0}px)`,
+    ].join(';');
+    container.appendChild(d);
+  }
+})();
+
+// ── Chart ──────────────────────────────────────────────────────────
+const chart = new Chart(
+  document.getElementById('loss-chart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label:'Train Loss', data:[], borderColor:'#58a6ff', backgroundColor:'rgba(88,166,255,0.08)',
+        fill:true, tension:0.35, pointRadius:3, pointHoverRadius:5, borderWidth:2 },
+      { label:'Val Loss',   data:[], borderColor:'#bc8cff', backgroundColor:'rgba(188,140,255,0.06)',
+        fill:true, tension:0.35, pointRadius:3, pointHoverRadius:5, borderWidth:2, borderDash:[5,3] }
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    animation:{ duration:400, easing:'easeOutQuart' },
+    plugins: {
+      legend: { labels:{ color:'#8b949e', font:{size:12}, padding:16 } },
+      tooltip:{
+        backgroundColor:'#161b22', borderColor:'#30363d', borderWidth:1,
+        titleColor:'#e6edf3', bodyColor:'#8b949e',
+        padding:10, cornerRadius:8,
+      }
+    },
+    scales: {
+      x:{ ticks:{color:'#8b949e'}, grid:{color:'#1c2128'},
+          title:{display:true,text:'Étape',color:'#8b949e'} },
+      y:{ ticks:{color:'#8b949e'}, grid:{color:'#1c2128'},
+          title:{display:true,text:'Loss',color:'#8b949e'} }
+    }
+  }
+});
+
+// ── Métadonnées hyperparamètres ────────────────────────────────────
+const PARAM_META = {
+  nb_params:     { label:'Paramètres',  desc:'Poids du modèle' },
+  n_layer:       { label:'Couches',     desc:'Blocs Transformer' },
+  n_head:        { label:'Têtes',       desc:'Têtes d\'attention' },
+  n_embd:        { label:'Embedding',   desc:'Dimension vecteurs' },
+  block_size:    { label:'Contexte',    desc:'Tokens en entrée' },
+  batch_size:    { label:'Batch',       desc:'Exemples / étape' },
+  dropout:       { label:'Dropout',     desc:'Régularisation' },
+  learning_rate: { label:'LR',          desc:'Vitesse apprentissage' },
+  taille_vocab:  { label:'Vocab BPE',   desc:'Tokens distincts' },
+  max_iters:     { label:'Max étapes',  desc:'Durée totale' },
+};
+function fmtParam(k, v) {
+  if (k === 'nb_params')     return (v / 1e6).toFixed(1) + 'M';
+  if (k === 'learning_rate') return v.toExponential(0);
+  if (k === 'max_iters' && v >= 999_999_000) return '∞';
+  return v;
+}
+
+// ── État global ────────────────────────────────────────────────────
+let bestVal     = Infinity;
+let bestStep    = 0;
+let lastModel   = null;
+let genExpanded = false;
+let appState    = 'idle';
+
+const STALE_MS = 20_000;
+const STARTING_GRACE_MS = 300_000;  // garde l ecran Demarrage sans flasher vers idle
+
+// ── Helpers ────────────────────────────────────────────────────────
+function fmtSec(s) {
+  if (s <= 0) return '< 1s';
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sc = Math.floor(s % 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${sc}s`;
+  return `${sc}s`;
+}
+function fmtToks(n) {
+  if (n >= 1e9) return (n/1e9).toFixed(2)+'B';
+  if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(0)+'K';
+  return String(n);
+}
+function lossColor(v) {
+  if (v < 1.5) return 'cg';
+  if (v < 2.5) return 'cy';
+  if (v < 4.0) return 'co';
+  return 'cr';
+}
+function lossTag(v) {
+  if (v < 1.5) return ['tg','✅ Très bon'];
+  if (v < 2.0) return ['tg','✅ Bon'];
+  if (v < 3.0) return ['ty','📈 Moyen'];
+  if (v < 5.0) return ['to','🔄 En apprentissage'];
+  return              ['tr','🔴 Début'];
+}
+function setTag(id, cls, txt, show = true) {
+  const el = document.getElementById(id);
+  el.style.display = show ? 'inline-block' : 'none';
+  if (show) { el.className = 'mtag ' + cls; el.textContent = txt; }
+}
+function set(id, txt) { document.getElementById(id).textContent = txt; }
+function cls(id, c)   { document.getElementById(id).className = c; }
+
+// Bump animation on metric value change
+function bump(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('bump');
+  void el.offsetWidth; // force reflow
+  el.classList.add('bump');
+}
+
+// Set metric value with bump animation when value changes
+const _prevVals = {};
+function setMetric(id, txt) {
+  if (_prevVals[id] !== txt) {
+    _prevVals[id] = txt;
+    set(id, txt);
+    bump(id);
+  }
+}
+
+// ── Gestion des états de l'UI ──────────────────────────────────────
+function applyState(newState) {
+  if (appState === newState) return;
+  appState = newState;
+  const idle   = document.getElementById('idle-screen');
+  const dash   = document.getElementById('dashboard');
+  const banner = document.getElementById('done-banner');
+  if (newState === 'idle') {
+    idle.classList.remove('hidden');
+    dash.classList.remove('show');
+    banner.classList.remove('show');
+  } else if (newState === 'running') {
+    idle.classList.add('hidden');
+    dash.classList.add('show');
+    banner.classList.remove('show');
+  } else if (newState === 'starting') {
+    idle.classList.add('hidden');
+    dash.classList.add('show');
+    banner.classList.remove('show');
+    const _sd = document.getElementById('s-dot'), _sl = document.getElementById('s-label');
+    if (_sd) _sd.className = 's-dot s-paused';
+    if (_sl) _sl.textContent = '⏳ Démarrage...';
+  } else { // done | converge
+    idle.classList.add('hidden');
+    dash.classList.add('show');
+    banner.classList.add('show');
+  }
+}
+
+// ── Reset dashboard ────────────────────────────────────────────────
+function resetDash() {
+  bestVal = Infinity; bestStep = 0;
+  chart.data.labels = [];
+  chart.data.datasets.forEach(d => d.data = []);
+  chart.update('none');
+  ['val-loss','train-loss','speed-val','eta-val','perp-val','best-val','gap-val','tok-val']
+    .forEach(id => set(id, '—'));
+  ['val-tag','train-tag','gap-tag','record-tag'].forEach(id => document.getElementById(id).style.display = 'none');
+  set('best-step', 'à l\'étape —');
+  set('gen-text', 'Le modèle n\'a pas encore généré de texte...');
+  document.getElementById('param-grid').innerHTML = '<div style="color:var(--dim);font-size:0.8rem;grid-column:1/-1">En attente...</div>';
+  ['ps1','ps2','ps3','ps4'].forEach(id => document.getElementById(id).classList.remove('on'));
+  const pf = document.getElementById('prog-fill');
+  pf.style.width = '0%'; pf.classList.remove('ind');
+  set('prog-pct', '0%'); set('iter-cur', '0'); set('iter-max', '/ —');
+  // Reset sections collapsibles
+  _lastBestForEvent = Infinity;
+  _events.length = 0;
+  const _evLog = document.getElementById('event-log');
+  if (_evLog) _evLog.innerHTML = '<div class="event-item"><span class="event-step">—</span><span class="event-text">Aucun événement pour l\'instant</span></div>';
+  ['delta-val','trend-txt','descent-rate','plateau-est',
+   'toks-s','data-mo','eff-batch','ckpt-count',
+   'params-per-layer','vram-theory','head-size','learn-state'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = '—'; el.className = 'info-val'; }
+  });
+  ['delta-sub','trend-sub','plateau-sub','ckpt-sub','learn-sub'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '—';
+  });
+}
+
+// ── Perplexité ─────────────────────────────────────────────────────
+function updatePerp(p) {
+  ['ps1','ps2','ps3','ps4'].forEach(id => document.getElementById(id).classList.remove('on'));
+  const el = document.getElementById('perp-val');
+  const txt = p >= 100 ? String(Math.round(p)) : p.toFixed(1);
+  if (_prevVals['perp-val'] !== txt) {
+    _prevVals['perp-val'] = txt;
+    el.textContent = txt;
+    bump('perp-val');
+  }
+  if      (p > 100) { document.getElementById('ps1').classList.add('on'); el.className='mval cr'; }
+  else if (p > 20)  { document.getElementById('ps2').classList.add('on'); el.className='mval co'; }
+  else if (p > 5)   { document.getElementById('ps3').classList.add('on'); el.className='mval cy'; }
+  else              { document.getElementById('ps4').classList.add('on'); el.className='mval cg'; }
+}
+
+// ── Hyperparamètres grid ───────────────────────────────────────────
+function renderParams(hp) {
+  const grid = document.getElementById('param-grid');
+  grid.innerHTML = '';
+  let i = 0;
+  for (const [k, meta] of Object.entries(PARAM_META)) {
+    if (hp[k] === undefined) continue;
+    const el = document.createElement('div'); el.className = 'param-item';
+    el.style.animationDelay = (i * 0.045) + 's';
+    el.innerHTML = `<div class="pi-label">${meta.label}</div><div class="pi-val">${fmtParam(k,hp[k])}</div><div class="pi-desc">${meta.desc}</div>`;
+    grid.appendChild(el);
+    i++;
+  }
+}
+
+// ── Mémoire (depuis log ou monitor.py) ────────────────────────────
+function updateMem(mem, temp, vramLimitGo, ramLimitGo) {
+  if (!mem) return;
+  // VRAM
+  const vu = mem.vram_go || 0, vt = mem.vram_total_go || 0, vp = mem.vram_pct || 0;
+  set('vram-val',   vu.toFixed(2) + ' Go');
+  set('vram-total', '/ ' + vt.toFixed(1) + ' Go');
+  set('vram-pct',   vp.toFixed(1) + '%');
+  const vb = document.getElementById('vram-bar');
+  vb.style.width = Math.min(vp, 100) + '%';
+  vb.className   = 'gauge-fill' + (vp > 90 ? ' gd' : vp > 70 ? ' gw' : '');
+  if (vramLimitGo && vt > 0) {
+    document.getElementById('vram-lim').style.left = (vramLimitGo/vt*100) + '%';
+    set('vram-hint', '🔴 Arrêt auto à ' + vramLimitGo + ' Go');
+  }
+  document.getElementById('vram-alert').classList.toggle('on', vp > 85);
+  // RAM
+  const ru = mem.ram_go || 0, rt = mem.ram_total_go || 0, rp = mem.ram_pct || 0;
+  set('ram-val',   ru.toFixed(1) + ' Go');
+  set('ram-total', '/ ' + rt.toFixed(1) + ' Go');
+  set('ram-pct',   rp.toFixed(1) + '%');
+  const rb = document.getElementById('ram-bar');
+  rb.style.width = Math.min(rp, 100) + '%';
+  rb.className   = 'gauge-fill' + (rp > 80 ? ' gd' : rp > 60 ? ' gw' : '');
+  if (ramLimitGo && rt > 0) {
+    document.getElementById('ram-lim').style.left = (ramLimitGo/rt*100) + '%';
+    set('ram-hint', '🔴 Arrêt auto à ' + ramLimitGo + ' Go');
+  }
+  document.getElementById('ram-alert').classList.toggle('on', rp > 80);
+  // CPU
+  const cp = mem.cpu_pct || 0;
+  set('cpu-val', cp.toFixed(0)); set('cpu-pct', cp.toFixed(1) + '%');
+  const cb = document.getElementById('cpu-bar');
+  cb.style.width = Math.min(cp, 100) + '%';
+  cb.className   = 'gauge-fill' + (cp > 90 ? ' gd' : cp > 70 ? ' gw' : '');
+  // Température GPU
+  const t = (temp !== undefined && temp !== null) ? temp : 0;
+  if (t > 0) {
+    set('temp-val', String(t));
+    const te = document.getElementById('temp-val');
+    te.className = 'mval ' + (t >= 87 ? 'cr' : t >= 80 ? 'co' : t >= 65 ? 'cy' : 'cg');
+    set('temp-pct',    t + '°C / 100°C');
+    set('temp-status', t >= 87 ? '🔴 Pause thermique' : t >= 80 ? '🟠 Chaud' : t >= 65 ? '🟡 Tiède' : '🟢 OK');
+    const tb = document.getElementById('temp-bar');
+    tb.style.width = Math.min(t, 100) + '%';
+    tb.className   = 'gauge-fill' + (t >= 87 ? ' gd' : t >= 80 ? ' gw' : '');
+    document.getElementById('temp-warn').classList.toggle('on', t >= 80 && t < 87);
+    document.getElementById('temp-crit').classList.toggle('on', t >= 87);
+  }
+}
+
+
+// ── Sections collapsibles ─────────────────────────────────────────────────
+let _sectState = {};
+try { _sectState = JSON.parse(localStorage.getItem('dashSections') || '{}'); } catch {}
+function toggleSection(id) {
+  const body = document.getElementById('body-' + id);
+  const tog  = document.getElementById('toggle-' + id);
+  const closed = body.classList.toggle('closed');
+  tog.classList.toggle('closed', closed);
+  _sectState[id] = closed;
+  try { localStorage.setItem('dashSections', JSON.stringify(_sectState)); } catch {}
+}
+(function restoreSections() {
+  for (const [id, closed] of Object.entries(_sectState)) {
+    if (!closed) continue;
+    const b = document.getElementById('body-' + id);
+    const t = document.getElementById('toggle-' + id);
+    if (b) b.classList.add('closed');
+    if (t) t.classList.add('closed');
+  }
+})();
+
+// ── Journal des événements ────────────────────────────────────────────────
+const _events = [];
+let   _lastBestForEvent = Infinity;
+function addEvent(step, icon, text) {
+  const key = icon + text;
+  if (_events.length > 0 && _events[0].key === key) return;
+  _events.unshift({ step, icon, text, key });
+  if (_events.length > 25) _events.pop();
+  const log = document.getElementById('event-log');
+  if (!log) return;
+  log.innerHTML = _events.map(e =>
+    '<div class="event-item">' +
+    '<span class="event-step">Étape ' + e.step.toLocaleString('fr') + '</span>' +
+    '<span class="event-ico">' + e.icon + '</span>' +
+    '<span class="event-text">' + e.text + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+// ── updateDetails — appelée à chaque refresh ──────────────────────────────
+function updateDetails(data, hp) {
+  const steps = data.steps || [];
+  const iter  = data.iteration_courante || 0;
+  const speed = parseFloat(data.vitesse_its) || 0;
+  const batch = hp.batch_size  || 4;
+  const block = hp.block_size  || 256;
+  const ga    = hp.grad_accum_steps || 1;
+  const ckptI = hp.checkpoint_interval || 500;
+
+  // ── Tendances ─────────────────────────────────────────────────────────
+  if (steps.length >= 2) {
+    const last  = steps[steps.length - 1];
+    const ref   = steps[Math.max(0, steps.length - 11)];
+    const delta = last.val_loss - ref.val_loss;
+    const dStep = Math.max(last.step - ref.step, 1);
+    const rate  = delta / dStep * 100;  // delta pour 100 étapes
+
+    const deltaEl = document.getElementById('delta-val');
+    deltaEl.textContent = (delta >= 0 ? '+' : '') + delta.toFixed(4);
+    deltaEl.className = 'info-val ' + (delta < -0.005 ? 'trend-good' : delta > 0.005 ? 'trend-bad' : 'trend-neutral');
+    set('delta-sub', delta < -0.005 ? '↓ En amélioration' : delta > 0.005 ? '↑ Détérioration' : '→ Stable');
+
+    const rateEl = document.getElementById('descent-rate');
+    rateEl.textContent = (rate >= 0 ? '+' : '') + rate.toFixed(4);
+    rateEl.className   = 'info-val ' + (rate < -0.001 ? 'trend-good' : rate > 0.001 ? 'trend-bad' : 'trend-neutral');
+
+    const trendEl  = document.getElementById('trend-txt');
+    if (delta < -0.005) {
+      trendEl.textContent = '↓ Descend'; trendEl.className = 'info-val trend-good';
+      set('trend-sub', "L'IA apprend bien");
+    } else if (delta > 0.005) {
+      trendEl.textContent = '↑ Overfitting'; trendEl.className = 'info-val trend-bad';
+      set('trend-sub', 'Val Loss remonte — attention');
+    } else {
+      trendEl.textContent = '→ Plateau'; trendEl.className = 'info-val trend-warn';
+      set('trend-sub', 'Convergence proche');
+    }
+
+    // -- Intégration Julia Insights --
+    if (data.insights && data.insights.convergence && data.insights.convergence.status === "succès") {
+      const conv = data.insights.convergence;
+      set('plateau-est', 'Valeur ~' + conv.plateau.toFixed(4));
+      if (conv.etapes_restantes > 0) {
+        set('plateau-sub', 'dans ~' + conv.etapes_restantes.toLocaleString('fr') + ' étapes (' + conv.confiance + ')');
+      } else {
+        set('plateau-sub', 'plateau atteint (' + conv.confiance + ')');
+      }
+    } else if (data.insights && data.insights.convergence) {
+      set('plateau-est', '?'); set('plateau-sub', 'données insuffisantes');
+    } else {
+      set('plateau-est', '—'); set('plateau-sub', 'en attente de Julia...');
+    }
+  }
+
+  // Chinchilla Overfitting Risk
+  if (data.insights && data.insights.chinchilla) {
+    const chin = data.insights.chinchilla;
+    set('chinchilla-risque', chin.risque.toUpperCase());
+    set('chinchilla-sub', 'Ratio: ' + chin.ratio + ' (cible 20)');
+    const chEl = document.getElementById('chinchilla-risque');
+    if (chin.risque === "critique" || chin.risque === "élevé") chEl.className = 'info-val trend-bad';
+    else if (chin.risque === "modéré") chEl.className = 'info-val trend-warn';
+    else chEl.className = 'info-val trend-good';
+  } else {
+    set('chinchilla-risque', '—');
+    set('chinchilla-sub', 'calcul...');
+  }
+  
+  if (data.lr_actuel) {
+    set('lr-val', data.lr_actuel.toExponential(2));
+    set('lr-sub', data.lr_actuel < hp.learning_rate * 0.99 ? "📉 Cosine Decay" : "🔥 Warmup/Stable");
+  } else {
+    set('lr-val', hp.learning_rate || '—');
+    set('lr-sub', 'Fixe');
+  }
+
+  // ── Performance ───────────────────────────────────────────────────────
+  if (speed > 0) set('toks-s', fmtToks(Math.round(speed * batch * block)) + '/s');
+  const toksTotal = iter * batch * block;
+  set('data-mo', (toksTotal * 4 / 1_000_000).toFixed(1) + ' Mo');
+  set('eff-batch', String(batch * ga));
+  set('ckpt-count', String(Math.floor(iter / Math.max(ckptI, 1))));
+  set('ckpt-sub', 'toutes les ' + ckptI + ' étapes');
+
+  // ── Modèle ────────────────────────────────────────────────────────────
+  const nE = hp.n_embd || 0, nH = hp.n_head || 1, nL = hp.n_layer || 0;
+  if (nE && nL) {
+    set('params-per-layer', ((12 * nE * nE) / 1e6).toFixed(2) + 'M');
+    const tot = hp.nb_params || (12 * nL * nE * nE + 32000 * nE);
+    set('vram-theory', (tot * 4 / 1024 / 1024 / 1024).toFixed(2) + ' Go');
+  }
+  if (nE && nH) set('head-size', String(Math.floor(nE / nH)));
+  if (steps.length > 0) {
+    const vl = steps[steps.length-1].val_loss;
+    const [, ltxt] = lossTag(vl);
+    const learnEl = document.getElementById('learn-state');
+    learnEl.textContent = ltxt;
+    learnEl.className = 'info-val ' + lossColor(vl);
+    const tip = vl > 5 ? 'Patience — apprentissage des bases' : vl > 3 ? 'Structures acquises' : vl > 2 ? 'Texte cohérent, continue !' : 'Excellent niveau !';
+    set('learn-sub', tip);
+  }
+
+  // ── Journal ───────────────────────────────────────────────────────────
+  if (steps.length > 0) {
+    const last = steps[steps.length-1];
+    if (last.val_loss < _lastBestForEvent - 0.001) {
+      _lastBestForEvent = last.val_loss;
+      addEvent(last.step, '🏆', 'Record val_loss : ' + last.val_loss.toFixed(4));
+    }
+  }
+  const statusMap = {
+    pause_thermique: ['🌡️', 'Pause thermique déclenchée'],
+    pause_ram:       ['⚠️', 'Pause RAM déclenchée'],
+    converge:        ['✅', 'Convergence atteinte !'],
+    termine:         ['🎉', 'Entraînement terminé !'],
+  };
+  if (statusMap[data.status]) {
+    const [ico, txt] = statusMap[data.status];
+    addEvent(iter, ico, txt);
+  }
+}
+
+// ── Suivi de session (détection nouvelle session go.py) ───────────────────
+let lastSessionId = null;
+let sessionStartMs = 0;
+
+async function checkSession() {
+  try {
+    const r = await fetch('session.json?t=' + Date.now());
+    if (!r.ok) return;
+    const s = await r.json();
+    const sid = String(s.id || '');
+    if (sid && sid !== lastSessionId) {
+      lastSessionId = sid;
+      lastModel = null;   // force reset au prochain fetchLog
+      resetDash();
+      // Ne montrer Demarrage que pour une session RECENTE (go.py vient
+      // de demarrer). Une vieille session.json laissee par un run precedent
+      // ne doit pas flasher l ecran de demarrage.
+      sessionStartMs = (s.ts || 0) * 1000 || Date.now();
+      if ((Date.now() - sessionStartMs) < STARTING_GRACE_MS) applyState('starting');
+    }
+  } catch {}
+}
+
+// ── Fetch log ──────────────────────────────────────────────────────
+async function fetchLog() {
+  try {
+    const ar = await fetch('model/active.json?t=' + Date.now());
+    if (ar.ok) {
+      const active = await ar.json();
+      const nom = active.model;
+      if (nom) {
+        const r = await fetch(`model/${nom}/log_active.json?t=` + Date.now());
+        if (r.ok) {
+          let logData = await r.json();
+          // Fetch Julia insights if available
+          try {
+            const ri = await fetch(`model/${nom}/insights.json?t=` + Date.now());
+            if (ri.ok) {
+              logData.insights = await ri.json();
+            }
+          } catch {}
+          return logData;
+        }
+      }
+    }
+  } catch {}
+  return null;
+}
+
+// ── Update principal ───────────────────────────────────────────────
+// injectedData : données SSE déjà chargées (évite un fetch inutile)
+async function update(injectedData) {
+  const data = (injectedData !== undefined) ? injectedData : await fetchLog();
+
+  if (!data) {
+    // Pendant le demarrage (session lancee mais logs pas encore ecrits :
+    // chargement donnees / tokenizer / cache BPE), on garde l ecran
+    // Demarrage au lieu de flasher vers idle.
+    const enDemarrage = appState === 'starting' &&
+                        sessionStartMs > 0 &&
+                        (Date.now() - sessionStartMs) < STARTING_GRACE_MS;
+    if (!enDemarrage) applyState('idle');
+    return;
+  }
+
+  const lastUpdateMs = (data.last_update || 0) * 1000;
+  const stale = lastUpdateMs > 0 && (Date.now() - lastUpdateMs) > STALE_MS;
+  const isDone = (data.status === 'termine' || data.status === 'converge');
+  if (stale && !isDone) { applyState('idle'); return; }
+
+  const modelKey = data.nom_modele || 'default';
+  if (lastModel !== null && lastModel !== modelKey) resetDash();
+  lastModel = modelKey;
+
+  if      (data.status === 'termine')  applyState('done');
+  else if (data.status === 'converge') applyState('converge');
+  else                                  applyState('running');
+
+  const hp = data.hyperparams || {};
+
+  // ── Bannière terminé ──────────────────────────────────────────
+  if (isDone) {
+    const isConverge = data.status === 'converge';
+    set('done-icon',   isConverge ? '⚙️' : '✅');
+    set('done-label',  isConverge ? 'Convergence atteinte !' : 'Entraînement terminé !');
+    set('dn-model',    data.nom_modele || '—');
+    set('dn-preset',   data.preset    || '—');
+    const last = data.steps && data.steps.length > 0 ? data.steps[data.steps.length-1] : null;
+    if (last) {
+      set('dn-val',    last.val_loss.toFixed(4));
+      set('dn-steps', (data.iteration_courante || last.step || 0).toLocaleString('fr'));
+      set('dn-duree',  fmtSec(last.temps || 0));
+    }
+  }
+
+  // ── Badges header ─────────────────────────────────────────────
+  set('b-model', '🤖 ' + (data.nom_modele || '—'));
+
+  const PEMOJI = { NANO:'🐢', SMALL:'🚀', MEDIUM:'⚡', LARGE:'🧠', CUSTOM:'🔧' };
+  const preset = data.preset || '—';
+  set('b-preset', (PEMOJI[preset] || '🔧') + ' ' + preset);
+
+  const modeEl  = document.getElementById('b-mode');
+  const modeVal = data.mode || 'auto';
+  modeEl.className = 'badge ' + (modeVal === 'auto' ? 'b-mode-auto' : 'b-mode-time');
+  modeEl.textContent = modeVal === 'auto' ? '⚙️ Mode auto' : '⏱️ ' + modeVal;
+
+  set('b-gpu',   '🎮 ' + (hp.gpu || hp.device || '—'));
+  set('b-clock', '🕐 Démarré ' + (data.debut || '—'));
+
+  // ── Statut pill ───────────────────────────────────────────────
+  const sd = document.getElementById('s-dot'), sl = document.getElementById('s-label');
+  const inf = hp.max_iters >= 999_999_000;
+  if      (isDone && data.status==='converge') { sd.className='s-dot s-converge'; sl.textContent='✅ Convergence'; }
+  else if (isDone)                              { sd.className='s-dot s-done';     sl.textContent='Terminé'; }
+  else if (data.status==='pause_thermique')     { sd.className='s-dot s-paused';   sl.textContent='⏸️ Pause thermique...'; }
+  else { sd.className='s-dot s-running'; sl.textContent = inf ? '⚙️ Convergence auto' : '▶ En cours...'; }
+
+  // ── Architecture ──────────────────────────────────────────────
+  if (hp.n_layer) set('arch-loop', `× ${hp.n_layer} blocs Transformer`);
+
+  // ── Hyperparams ───────────────────────────────────────────────
+  if (Object.keys(hp).length > 2) renderParams(hp);
+  updateDetails(data, hp);
+  setTag('device-tag', 'tb', (hp.gpu || hp.device || '—').toUpperCase(), true);
+
+  // ── Progression ───────────────────────────────────────────────
+  const iter = data.iteration_courante || 0;
+  const maxI = hp.max_iters || 0;
+  const inf2 = maxI >= 999_999_000;
+  set('iter-cur', iter.toLocaleString('fr'));
+  set('iter-max', inf2 ? '/ ∞ (auto)' : `/ ${maxI.toLocaleString('fr')}`);
+  const pct = data.progression || 0;
+  const pf  = document.getElementById('prog-fill');
+  if (inf2 && !isDone) {
+    pf.classList.add('ind'); set('prog-pct', 'Auto');
+  } else {
+    pf.classList.remove('ind'); pf.style.width = pct + '%'; set('prog-pct', pct + '%');
+  }
+
+  // ── Vitesse + ETA ─────────────────────────────────────────────
+  if (data.vitesse_its) set('speed-val', data.vitesse_its + ' it/s');
+  if (!inf2 && data.eta_secondes != null) {
+    setMetric('eta-val', fmtSec(data.eta_secondes));
+    if (data.eta_secondes > 0) {
+      const fin = new Date(Date.now() + data.eta_secondes * 1000);
+      set('eta-sub', 'Fin prévue : ' + fin.toLocaleTimeString('fr',{hour:'2-digit',minute:'2-digit'}));
+    }
+  } else if (inf2) {
+    set('eta-val', '∞'); set('eta-sub', 'Jusqu\'à convergence');
+  }
+
+  // ── Dernier step ─────────────────────────────────────────────
+  if (data.steps && data.steps.length > 0) {
+    const last = data.steps[data.steps.length - 1];
+    const vl   = last.val_loss, tl = last.train_loss;
+    const perp = Math.exp(vl), gap = vl - tl;
+    const step = last.step;
+    const toks = step * (hp.batch_size||16) * (hp.block_size||256);
+
+    // Val Loss
+    const [vtc, vtl] = lossTag(vl);
+    const vlEl = document.getElementById('val-loss');
+    const vlTxt = vl.toFixed(4);
+    if (_prevVals['val-loss'] !== vlTxt) {
+      _prevVals['val-loss'] = vlTxt;
+      vlEl.textContent = vlTxt; vlEl.className = 'mval ' + lossColor(vl);
+      bump('val-loss');
+    }
+    setTag('val-tag', vtc, vtl);
+
+    // Train Loss
+    const [ttc, ttl] = lossTag(tl);
+    const tlEl = document.getElementById('train-loss');
+    const tlTxt = tl.toFixed(4);
+    if (_prevVals['train-loss'] !== tlTxt) {
+      _prevVals['train-loss'] = tlTxt;
+      tlEl.textContent = tlTxt; tlEl.className = 'mval ' + lossColor(tl);
+      bump('train-loss');
+    }
+    setTag('train-tag', ttc, ttl);
+
+    // Perplexité
+    updatePerp(perp);
+
+    // Temps écoulé
+    set('elapsed',   fmtSec(last.temps) + ' écoulées');
+    set('prog-eta',  'Dernière éval : étape ' + step.toLocaleString('fr'));
+
+    // Meilleure val loss
+    if (vl < bestVal) {
+      const wasRecord = bestVal < Infinity;
+      bestVal = vl; bestStep = step;
+      set('best-val',  vl.toFixed(4));
+      set('best-step', 'à l\'étape ' + step.toLocaleString('fr'));
+      if (wasRecord) {
+        setTag('record-tag', 'tg', '🎉 Nouveau record !');
+        const bc = document.getElementById('best-card');
+        bc.classList.add('flashing');
+        setTimeout(() => { bc.classList.remove('flashing'); document.getElementById('record-tag').style.display='none'; }, 3000);
+      }
+    }
+
+    // Overfitting gap
+    const gEl = document.getElementById('gap-val');
+    const gTxt = (gap >= 0 ? '+' : '') + gap.toFixed(4);
+    if (_prevVals['gap-val'] !== gTxt) {
+      _prevVals['gap-val'] = gTxt;
+      gEl.textContent = gTxt;
+      bump('gap-val');
+    }
+    if      (gap < 0.1) { gEl.className='mval cg'; setTag('gap-tag','tg','✅ Pas d\'overfitting'); }
+    else if (gap < 0.3) { gEl.className='mval cy'; setTag('gap-tag','ty','⚡ Léger'); }
+    else                { gEl.className='mval co'; setTag('gap-tag','to','⚠️ Overfitting'); }
+
+    // Tokens
+    setMetric('tok-val', fmtToks(toks));
+    set('tok-sub', `batch ${hp.batch_size||'?'} × bloc ${hp.block_size||'?'} × ${step.toLocaleString('fr')} étapes`);
+
+    // Texte généré
+    if (last.exemple) set('gen-text', last.exemple);
+
+    // Graphique
+    chart.data.labels           = data.steps.map(s => s.step);
+    chart.data.datasets[0].data = data.steps.map(s => s.train_loss);
+    chart.data.datasets[1].data = data.steps.map(s => s.val_loss);
+    chart.update('none');
+  }
+
+  // ── Mémoire ───────────────────────────────────────────────────
+  const mem = data.memoire || (data.steps && data.steps.length > 0 ? data.steps[data.steps.length-1].memoire : null);
+  if (mem) {
+    const vl = hp.vram_total_go ? Math.round(hp.vram_total_go * 0.85 * 10) / 10 : null;
+    const rl = hp.ram_total_go  ? Math.round(hp.ram_total_go  * 0.80 * 10) / 10 : null;
+    updateMem(mem, data.temp_gpu || 0, vl, rl);
+  }
+
+  set('last-ref', new Date().toLocaleTimeString('fr'));
+}
+
+// ── monitor.py optionnel (conservé pour compatibilité file://) ─────
+function tryMonitor() {}   // remplacé par SSE ci-dessous
+
+// ── Texte généré — expand ──────────────────────────────────────────
+function toggleGen() {
+  genExpanded = !genExpanded;
+  document.getElementById('gen-text').classList.toggle('exp', genExpanded);
+  document.getElementById('gen-btn').textContent = genExpanded ? '↑ Réduire' : '↕ Voir tout';
+}
+
+// ── SSE — remplace tous les setInterval ────────────────────────────
+(function() {
+  // Fonctionne uniquement en http: (pas en file://)
+  if (window.location.protocol !== 'http:') {
+    // Fallback polling pour file://
+    update();
+    setInterval(update, 3000);
+    checkSession();
+    setInterval(checkSession, 2000);
+    return;
+  }
+
+  const es = new EventSource('/api/events');
+
+  es.onmessage = function(e) {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'log') {
+        // Simule la réponse de fetchLog()
+        _applyLog(msg.data);
+      } else if (msg.type === 'session') {
+        _applySession(msg.data);
+      } else if (msg.type === 'monitor') {
+        const m = msg.data;
+        const mem = {
+          vram_go:       m.gpu?.utilise_go  || 0,
+          vram_total_go: m.gpu?.total_go    || 0,
+          vram_pct:      m.gpu?.pct         || 0,
+          ram_go:        m.ram?.utilise_go  || 0,
+          ram_total_go:  m.ram?.total_go    || 0,
+          ram_pct:       m.ram?.pct         || 0,
+          cpu_pct:       m.cpu?.pct         || 0,
+        };
+        updateMem(mem, m.gpu?.temp_c || 0, null, null);
+      }
+    } catch {}
+  };
+
+  es.onerror = function() {
+    // SSE coupé → fallback polling
+    es.close();
+    setInterval(update, 3000);
+    setInterval(checkSession, 2000);
+  };
+
+  // Premier rendu immédiat
+  update();
+  checkSession();
+})();
+
+// Wrappers pour appliquer les données reçues par SSE
+function _applyLog(data) {
+  // Injecte les données SSE directement dans update() — pas de fetch superflu
+  update(data || null);
+}
+function _applySession(s) {
+  const sid = String(s.id || '');
+  if (sid && sid !== lastSessionId) {
+    lastSessionId = sid;
+    lastModel = null;
+    resetDash();
+    sessionStartMs = (s.ts || 0) * 1000 || Date.now();
+    if ((Date.now() - sessionStartMs) < STARTING_GRACE_MS) applyState('starting');
+  }
+}
+
+// ── Comparaison multi-modèles ──────────────────────────────────────
+let compareChart = null;
+let compareOpen  = false;
+
+function toggleCompare() {
+  compareOpen = !compareOpen;
+  document.getElementById('compare-panel').style.display = compareOpen ? 'block' : 'none';
+  document.getElementById('btn-compare').style.color = compareOpen ? 'var(--blue)' : '#8b949e';
+  if (compareOpen) loadCompare();
+}
+
+async function loadCompare() {
+  const status = document.getElementById('compare-status');
+  status.textContent = 'Chargement...';
+  try {
+    const r = await fetch('/api/models');
+    if (!r.ok) { status.textContent = 'Erreur chargement modèles'; return; }
+    const modeles = await r.json();
+    const noms = Object.keys(modeles);
+    if (noms.length === 0) { status.textContent = 'Aucun modèle trouvé dans model/'; return; }
+    status.textContent = `${noms.length} modèle(s) — cliquer pour actualiser`;
+
+    const COLORS = ['#58a6ff','#bc8cff','#3fb950','#f0883e','#e3b341','#f85149','#79c0ff','#d2a8ff'];
+    const datasets = [];
+    noms.forEach((nom, i) => {
+      const m = modeles[nom];
+      const col = COLORS[i % COLORS.length];
+      datasets.push({
+        label: nom + ' train',
+        data: m.steps.map((s, j) => ({ x: s, y: m.train[j] })),
+        borderColor: col, backgroundColor: col + '18',
+        fill: false, tension: 0.35, pointRadius: 2, borderWidth: 2,
+      });
+      if (m.val.some(v => v != null)) {
+        datasets.push({
+          label: nom + ' val',
+          data: m.steps.map((s, j) => ({ x: s, y: m.val[j] })),
+          borderColor: col, borderDash: [5,3],
+          fill: false, tension: 0.35, pointRadius: 2, borderWidth: 1.5,
+        });
+      }
+    });
+
+    if (compareChart) compareChart.destroy();
+    compareChart = new Chart(
+      document.getElementById('compare-chart').getContext('2d'), {
+      type: 'line',
+      data: { datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        parsing: false,
+        animation: { duration: 300 },
+        plugins: {
+          legend: { labels: { color: '#8b949e', font: { size: 11 }, padding: 12 } },
+          tooltip: { backgroundColor: '#161b22', borderColor: '#30363d', borderWidth: 1,
+                     titleColor: '#e6edf3', bodyColor: '#8b949e', padding: 8, cornerRadius: 6 }
+        },
+        scales: {
+          x: { type: 'linear', ticks: { color: '#8b949e' }, grid: { color: '#1c2128' },
+               title: { display: true, text: 'Étape', color: '#8b949e' } },
+          y: { ticks: { color: '#8b949e' }, grid: { color: '#1c2128' },
+               title: { display: true, text: 'Loss', color: '#8b949e' } }
+        }
+      }
+    });
+  } catch(err) {
+    status.textContent = 'Erreur : ' + err.message;
+  }
+}
+</script>
+</body>
+</html>
