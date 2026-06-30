@@ -2,13 +2,13 @@
 
 All notable changes and improvements to WishAI.
 
-Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Times are US Eastern (ET).
+Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 [🇫🇷 Version française](FR/CHANGELOG.md)
 
 ---
 
-## [1.5.2] — 2026-06-25 12h10.pm
+## [1.5.2] — 2026-06-25
 
 Major update improving training reliability, logging, and internal architecture.
 
@@ -35,7 +35,7 @@ Major update improving training reliability, logging, and internal architecture.
 
 ---
 
-## [1.5.1] — 2026-06-25 9h18.am
+## [1.5.1] — 2026-06-25
 
 ### ✨ Added
 
@@ -61,7 +61,7 @@ Major update improving training reliability, logging, and internal architecture.
 
 ---
 
-## [1.5.0] — 2026-06-24 18h13.pm
+## [1.5.0] — 2026-06-24
 
 ### ✨ Added
 
@@ -85,7 +85,7 @@ Major update improving training reliability, logging, and internal architecture.
 
 ---
 
-## [1.4.0] — 2026-06-24 9h22.am
+## [1.4.0] — 2026-06-24
 
 ### ✨ Added
 
@@ -109,7 +109,7 @@ Major update improving training reliability, logging, and internal architecture.
 
 ---
 
-## [1.3.3] — 2026-06-24 8h26.am
+## [1.3.3] — 2026-06-24
 
 ### ✨ Added
 
@@ -118,7 +118,7 @@ Major update improving training reliability, logging, and internal architecture.
 
 ---
 
-## [1.3.2] — 2026-06-24 07:54.am
+## [1.3.2] — 2026-06-24
 
 ### ♻️ Changed
 
@@ -143,7 +143,7 @@ Major update improving training reliability, logging, and internal architecture.
 
 ---
 
-## [1.3.0] — 2026-06-23 19:34.pm
+## [1.3.0] — 2026-06-23
 
 ### ✨ Added
 
@@ -168,7 +168,7 @@ Major update improving training reliability, logging, and internal architecture.
 
 ---
 
-## [1.2.0] — 2026-06-21 18:28.pm
+## [1.2.0] — 2026-06-21
 
 ### ✨ Added
 
@@ -193,7 +193,7 @@ Major update improving training reliability, logging, and internal architecture.
 
 ---
 
-## [1.1.0] — 2026-06-21 18:20.pm
+## [1.1.0] — 2026-06-21
 
 ### ♻️ Changed
 
@@ -218,7 +218,7 @@ Major update improving training reliability, logging, and internal architecture.
 
 ---
 
-## [1.0.0] — 2026-06-21 18:20.pm
+## [1.0.0] — 2026-06-21
 
 First stable version. Code review, bug fixes and safety net (tests).
 
